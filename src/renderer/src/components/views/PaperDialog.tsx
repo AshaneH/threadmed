@@ -4,7 +4,8 @@
 // Modal for adding a new paper manually or editing an existing one.
 // ============================================================================
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Save } from 'lucide-react'
 import type { CreatePaperInput, PaperWithAuthors } from '@/types'
 
@@ -23,8 +24,25 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
     const [doi, setDoi] = useState(initialData?.doi || '')
     const [abstract, setAbstract] = useState(initialData?.abstract || '')
     const [isSaving, setIsSaving] = useState(false)
+    const [mounted, setMounted] = useState(false)
 
-    if (!isOpen) return null
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    useEffect(() => {
+        if (isOpen) {
+            setTitle(initialData?.title || '')
+            setAuthors(initialData?.authors?.join(', ') || '')
+            setYear(initialData?.year?.toString() || '')
+            setJournal(initialData?.journal || '')
+            setDoi(initialData?.doi || '')
+            setAbstract(initialData?.abstract || '')
+            setIsSaving(false)
+        }
+    }, [isOpen, initialData])
+
+    if (!isOpen || !mounted) return null
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -56,15 +74,16 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
         }
     }
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[var(--color-bg-surface)] w-full max-w-2xl rounded-2xl shadow-2xl border border-[var(--color-border)] flex flex-col max-h-[90vh] overflow-hidden">
+    const modalContent = (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in text-left">
+            <form onSubmit={handleSubmit} className="bg-[var(--color-bg-surface)] w-full max-w-2xl rounded-2xl shadow-2xl border border-[var(--color-border)] flex flex-col max-h-[90vh] overflow-hidden">
                 {/* ── Header ────────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border-subtle)] shrink-0">
                     <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
                         {initialData ? 'Edit Paper' : 'Add Paper Manually'}
                     </h2>
                     <button
+                        type="button"
                         onClick={onClose}
                         className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] p-1.5 rounded-lg transition-colors"
                     >
@@ -73,7 +92,7 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
                 </div>
 
                 {/* ── Form Body ─────────────────────────────────────────────── */}
-                <form id="paper-form" onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
+                <div className="p-6 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
                     {/* Title */}
                     <div className="space-y-1.5">
                         <label className="text-[13px] font-semibold text-[var(--color-text-secondary)]">
@@ -160,7 +179,7 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
                             className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-[14px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/20 transition-all placeholder:text-[var(--color-text-tertiary)]/50 resize-y"
                         />
                     </div>
-                </form>
+                </div>
 
                 {/* ── Footer ────────────────────────────────────────────────── */}
                 <div className="px-6 py-4 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] flex justify-end gap-3 shrink-0 rounded-b-2xl">
@@ -173,7 +192,6 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
                     </button>
                     <button
                         type="submit"
-                        form="paper-form"
                         disabled={isSaving || !title.trim()}
                         className="flex items-center gap-2 px-5 py-2 bg-[var(--color-accent)] text-white text-[13px] font-semibold rounded-lg hover:bg-[var(--color-accent-hover)] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-[var(--color-accent)]/20"
                     >
@@ -181,7 +199,9 @@ export function PaperDialog({ isOpen, onClose, onSave, initialData }: PaperDialo
                         {isSaving ? 'Saving...' : 'Save Paper'}
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
     )
+
+    return createPortal(modalContent, document.body)
 }

@@ -38,7 +38,8 @@ const api = {
         delete: (id: string) => ipcRenderer.invoke('folders:delete', id),
         addPaper: (paperId: string, folderId: string) => ipcRenderer.invoke('folders:addPaper', paperId, folderId),
         removePaper: (paperId: string, folderId: string) => ipcRenderer.invoke('folders:removePaper', paperId, folderId),
-        getPapers: (folderId: string) => ipcRenderer.invoke('folders:getPapers', folderId)
+        getPapers: (folderId: string) => ipcRenderer.invoke('folders:getPapers', folderId),
+        getMappings: () => ipcRenderer.invoke('folders:getMappings')
     },
 
     // ── Nodes ──────────────────────────────────────────────────────────────

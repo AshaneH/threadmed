@@ -91,7 +91,11 @@ export class ZoteroClient {
                 this.lastLibraryVersion = parseInt(libVersion, 10)
             }
 
-            const data = await res.json()
+            const contentType = res.headers.get('content-type') || ''
+            const data = contentType.includes('application/json')
+                ? await res.json()
+                : await res.text()
+
             return { data, headers: res.headers }
         }
 
@@ -153,6 +157,43 @@ export class ZoteroClient {
         }
 
         return allItems
+    }
+
+    /** Fetch all item keys to detect local deletions */
+    async fetchAllKeys(): Promise<string[]> {
+        const allKeys: string[] = []
+        let start = 0
+
+        while (true) {
+            const { headers, data } = await this.request('/items', {
+                format: 'keys',
+                itemType: '-attachment || note',
+                limit: PAGE_SIZE,
+                start
+            })
+
+            const keys = (typeof data === 'string' ? data : '').trim().split('\n').filter(Boolean)
+            allKeys.push(...keys)
+
+            const totalResults = parseInt(headers.get('Total-Results') || '0', 10)
+            start += PAGE_SIZE
+
+            if (start >= totalResults || keys.length === 0) {
+                break
+            }
+        }
+
+        return allKeys
+    }
+
+    /** Fetch specific items by their keys */
+    async fetchItemsByKeys(keys: string[]): Promise<ZoteroItem[]> {
+        if (keys.length === 0) return []
+        const { data } = await this.request('/items', {
+            format: 'json',
+            itemKey: keys.join(',')
+        })
+        return data as ZoteroItem[]
     }
 
     /** Fetch child items (attachments) for a given parent item key */

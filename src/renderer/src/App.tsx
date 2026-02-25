@@ -21,6 +21,7 @@ function App() {
                     <LibraryView
                         selectedFolderId={selectedFolderId}
                         onPaperSelect={(id) => { setSelectedPaperId(id); setActiveView('paper') }}
+                        onFolderSelect={setSelectedFolderId}
                         onNavigate={(view) => setActiveView(view as ViewId)}
                     />
                 )
@@ -76,7 +77,6 @@ function App() {
                 activeView={activeView}
                 onViewChange={(view) => {
                     setActiveView(view)
-                    if (view !== 'library') setSelectedFolderId(null)
                 }}
                 selectedPaperId={selectedPaperId}
                 onPaperSelect={setSelectedPaperId}

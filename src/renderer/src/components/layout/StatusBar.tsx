@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
+import { useDataRefresh } from '@/lib/events'
 import { Database, HardDrive } from 'lucide-react'
 
 export function StatusBar() {
@@ -12,6 +13,8 @@ export function StatusBar() {
     useEffect(() => {
         loadStatus()
     }, [])
+
+    useDataRefresh(loadStatus)
 
     async function loadStatus() {
         try {

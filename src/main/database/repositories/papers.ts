@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { v4 as uuidv4 } from 'uuid'
-import { join } from 'path'
+import { join, basename } from 'path'
 import { unlinkSync, existsSync } from 'fs'
 import { getDb, getPdfDir } from '../connection'
 
@@ -209,7 +209,9 @@ export function deletePaper(id: string): void {
 
     // Delete PDF from disk if it exists
     if (paper?.pdf_filename) {
-        const pdfPath = join(getPdfDir(), paper.pdf_filename)
+        // Use basename to prevent directory traversal attacks if database is compromised
+        const safeFilename = basename(paper.pdf_filename)
+        const pdfPath = join(getPdfDir(), safeFilename)
         if (existsSync(pdfPath)) {
             try {
                 unlinkSync(pdfPath)
@@ -228,7 +230,7 @@ export function updatePaper(id: string, updates: Partial<CreatePaperInput>): voi
     const db = getDb()
 
     const setClauses: string[] = []
-    const values: any[] = []
+    const values: (string | number | null)[] = []
 
     if (updates.title !== undefined) { setClauses.push('title = ?'); values.push(updates.title) }
     if (updates.year !== undefined) { setClauses.push('year = ?'); values.push(updates.year) }

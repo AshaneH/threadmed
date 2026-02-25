@@ -11,7 +11,7 @@ import { listNodes, createNode, updateNode, deleteNode } from '../database/repos
 import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation } from '../database/repositories/annotations'
 import { getDbPath, getPdfDir } from '../database/connection'
 import { connectZotero, disconnectZotero, getZoteroStatus, syncLibrary } from '../services/sync-engine'
-import { listFolders, createFolder, updateFolder, deleteFolder, addPaperToFolder, removePaperFromFolder, getPapersInFolder } from '../database/repositories/folders'
+import { listFolders, createFolder, updateFolder, deleteFolder, addPaperToFolder, removePaperFromFolder, getPapersInFolder, getPaperMappings } from '../database/repositories/folders'
 import { deletePaper, updatePaper } from '../database/repositories/papers'
 import type { CreatePaperInput } from '../database/repositories/papers'
 import type { CreateAnnotationInput } from '../database/repositories/annotations'
@@ -59,8 +59,8 @@ export function registerIpcHandlers(): void {
         return createFolder(name, parentId)
     })
 
-    ipcMain.handle('folders:update', (_event, id: string, name: string) => {
-        return updateFolder(id, name)
+    ipcMain.handle('folders:update', (_event, id: string, updates: { name?: string, parent_id?: string | null }) => {
+        return updateFolder(id, updates)
     })
 
     ipcMain.handle('folders:delete', (_event, id: string) => {
@@ -77,6 +77,10 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('folders:getPapers', (_event, folderId: string) => {
         return getPapersInFolder(folderId)
+    })
+
+    ipcMain.handle('folders:getMappings', () => {
+        return getPaperMappings()
     })
 
     // ── Node Handlers ────────────────────────────────────────────────────────

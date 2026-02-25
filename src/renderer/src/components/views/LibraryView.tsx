@@ -2,39 +2,60 @@
 // ThreadMed — Library View
 // ============================================================================
 
-import { useState, useEffect } from 'react'
-import { BookOpen, ExternalLink, Plus, FileText, Trash2, Folder as FolderIcon, Edit2 } from 'lucide-react'
+import { useState, useEffect, Fragment } from 'react'
+import { BookOpen, ExternalLink, Plus, FileText, Trash2, Folder as FolderIcon, Edit2, ChevronRight } from 'lucide-react'
 import { PaperDialog } from './PaperDialog'
+import { triggerDataRefresh, useDataRefresh } from '@/lib/events'
+import { isDescendant, getPathDepth, getTreeDepth } from '@/lib/dnd'
+import { cn } from '@/lib/utils'
 import type { Paper, Folder, CreatePaperInput, PaperWithAuthors } from '@/types'
 
 interface LibraryViewProps {
     selectedFolderId: string | null
     onPaperSelect: (id: string) => void
+    onFolderSelect: (id: string | null) => void
     onNavigate: (view: string) => void
 }
 
-export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: LibraryViewProps) {
+export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, onNavigate }: LibraryViewProps) {
     const [papers, setPapers] = useState<Paper[]>([])
     const [currentFolder, setCurrentFolder] = useState<Folder | null>(null)
     const [loading, setLoading] = useState(true)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingPaper, setEditingPaper] = useState<PaperWithAuthors | null>(null)
+    const [folders, setFolders] = useState<Folder[]>([])
+    const [paperFoldersMap, setPaperFoldersMap] = useState<Record<string, string[]>>({})
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
     }, [selectedFolderId])
+
+    useDataRefresh(loadData)
 
     async function loadData() {
         try {
             setLoading(true)
             if (!window.api) return
 
+            // Load all folders and mappings so we can show badges
+            const [folderList, mappings] = await Promise.all([
+                window.api.folders.list(),
+                window.api.folders.getMappings()
+            ])
+            setFolders(folderList)
+
+            // Build map of paperId -> array of folderIds
+            const pMap: Record<string, string[]> = {}
+            for (const { paper_id, folder_id } of mappings) {
+                if (!pMap[paper_id]) pMap[paper_id] = []
+                pMap[paper_id].push(folder_id)
+            }
+            setPaperFoldersMap(pMap)
+
             // If viewing a folder, load that folder's details and papers
             if (selectedFolderId) {
-                const [folderList, folderPapers] = await Promise.all([
-                    window.api.folders.list(),
-                    window.api.folders.getPapers(selectedFolderId)
-                ])
+                const folderPapers = await window.api.folders.getPapers(selectedFolderId)
                 const folder = folderList.find((f: Folder) => f.id === selectedFolderId) || null
                 setCurrentFolder(folder)
                 setPapers(folderPapers)
@@ -57,6 +78,7 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
             try {
                 await window.api.papers.delete(id)
                 await loadData() // Refresh view
+                triggerDataRefresh() // Refresh Sidebar & StatusBar
             } catch (err) {
                 console.error('[LibraryView] Failed to delete paper:', err)
                 alert('Failed to delete paper. See console for details.')
@@ -75,6 +97,7 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
             }
         }
         await loadData()
+        triggerDataRefresh()
     }
 
     if (loading) {
@@ -85,8 +108,12 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
         )
     }
 
+    const subfolders = currentFolder
+        ? folders.filter(f => f.parent_id === currentFolder.id)
+        : folders.filter(f => f.parent_id === null)
+
     // ── Empty State: Welcome Screen ──────────────────────────────────────────
-    if (papers.length === 0) {
+    if (!currentFolder && papers.length === 0 && subfolders.length === 0) {
         return (
             <div className="flex items-center justify-center h-full px-8">
                 <div className="text-center space-y-10 max-w-xl animate-fade-in">
@@ -184,21 +211,118 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
         )
     }
 
+
+
+    const handleDropOnFolder = async (e: React.DragEvent, targetId: string | null) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOverFolderId(null)
+
+        const pId = e.dataTransfer.getData('application/threadmed-paper')
+        const sourceFolderId = e.dataTransfer.getData('application/threadmed-source-folder')
+        const draggedFolderId = e.dataTransfer.getData('application/threadmed-folder')
+
+        if (draggedFolderId) {
+            if (draggedFolderId !== targetId) {
+                if (targetId && isDescendant(folders, targetId, draggedFolderId)) {
+                    alert("Cannot drop a folder into itself or its own subfolder.")
+                    return
+                }
+
+                const targetDepth = getPathDepth(folders, targetId)
+                const draggedDepth = getTreeDepth(folders, draggedFolderId)
+                if (targetDepth + draggedDepth > 3) {
+                    alert(`Cannot drop here! Folders can only be nested 3 levels deep.`)
+                    return
+                }
+
+                try {
+                    await window.api.folders.update(draggedFolderId, { parent_id: targetId })
+                    await loadData()
+                    triggerDataRefresh()
+                } catch (err) {
+                    console.error('[LibraryView onDrop] Error updating folder:', err)
+                }
+            }
+        } else if (pId && sourceFolderId !== targetId) {
+            if (sourceFolderId) {
+                await window.api.folders.removePaper(pId, sourceFolderId)
+            }
+            if (targetId) {
+                await window.api.folders.addPaper(pId, targetId)
+            }
+            await loadData()
+            triggerDataRefresh()
+        }
+    }
+
     // ── Paper List ─────────────────────────────────────────────────────────────
     return (
         <div className="p-6 space-y-3 animate-fade-in relative">
             <div className="flex items-center gap-4 mb-6">
                 <div className="flex-1 min-w-0">
-                    <h2 className="text-xl font-bold text-[var(--color-text-primary)] tracking-tight flex items-center gap-3">
-                        {currentFolder ? (
-                            <>
-                                <FolderIcon size={20} className="text-[var(--color-accent)] shrink-0" />
-                                <span className="truncate">{currentFolder.name}</span>
-                            </>
-                        ) : (
-                            'All Papers'
-                        )}
-                        <span className="text-[14px] font-normal text-[var(--color-text-tertiary)] shrink-0 bg-[var(--color-bg-elevated)] px-2.5 py-0.5 rounded-full border border-[var(--color-border-subtle)]">
+                    <h2 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                        <button
+                            onClick={() => onFolderSelect(null)}
+                            onDragOver={(e) => {
+                                if (e.dataTransfer.types.includes('application/threadmed-paper') || e.dataTransfer.types.includes('application/threadmed-folder')) {
+                                    e.preventDefault()
+                                    e.dataTransfer.dropEffect = 'move'
+                                    if (currentFolder !== null) setDragOverFolderId('root') // Only highlight if not currently in root
+                                }
+                            }}
+                            onDragLeave={() => setDragOverFolderId(null)}
+                            onDrop={(e) => handleDropOnFolder(e, null)}
+                            className={cn(
+                                "transition-colors px-2 py-1 rounded-md",
+                                dragOverFolderId === 'root'
+                                    ? "bg-[var(--color-accent-subtle)] outline-dashed outline-1 outline-[var(--color-accent)] text-[var(--color-accent)]"
+                                    : currentFolder ? "text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]" : "text-[var(--color-text-primary)]"
+                            )}
+                        >
+                            Library
+                        </button>
+
+                        {(() => {
+                            if (!currentFolder) return null;
+                            const path: Folder[] = [];
+                            let curr: Folder | undefined = currentFolder;
+                            while (curr) {
+                                path.unshift(curr);
+                                const currentParentId: string | null = curr.parent_id;
+                                curr = currentParentId ? folders.find(f => f.id === currentParentId) : undefined;
+                            }
+                            return path.map((folder, index) => (
+                                <Fragment key={folder.id}>
+                                    <ChevronRight size={18} className="text-[var(--color-text-tertiary)]" />
+                                    <button
+                                        onClick={() => onFolderSelect(folder.id)}
+                                        onDragOver={(e) => {
+                                            if (e.dataTransfer.types.includes('application/threadmed-paper') || e.dataTransfer.types.includes('application/threadmed-folder')) {
+                                                e.preventDefault()
+                                                e.dataTransfer.dropEffect = 'move'
+                                                if (folder.id !== currentFolder.id) setDragOverFolderId(folder.id)
+                                            }
+                                        }}
+                                        onDragLeave={() => setDragOverFolderId(null)}
+                                        onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                                        className={cn(
+                                            "flex items-center gap-2.5 transition-colors min-w-0 shrink px-2 py-1 rounded-md",
+                                            dragOverFolderId === folder.id
+                                                ? "bg-[var(--color-accent-subtle)] outline-dashed outline-1 outline-[var(--color-accent)] text-[var(--color-accent)]"
+                                                : index === path.length - 1
+                                                    ? "text-[var(--color-text-primary)] cursor-default"
+                                                    : "text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]"
+                                        )}
+                                        disabled={index === path.length - 1}
+                                    >
+                                        {index === path.length - 1 && <FolderIcon size={20} className="text-[var(--color-accent)] shrink-0" />}
+                                        <span className="truncate max-w-[400px]">{folder.name}</span>
+                                    </button>
+                                </Fragment>
+                            ))
+                        })()}
+                        <span className="ml-1 text-[14px] font-normal text-[var(--color-text-tertiary)] shrink-0 bg-[var(--color-bg-elevated)] px-2.5 py-0.5 rounded-full border border-[var(--color-border-subtle)]">
                             {papers.length}
                         </span>
                     </h2>
@@ -215,9 +339,57 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
                 </button>
             </div>
 
+            {/* Subfolders */}
+            {subfolders.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {subfolders.map(folder => (
+                        <button
+                            key={folder.id}
+                            draggable
+                            onDragStart={(e) => {
+                                e.stopPropagation()
+                                e.dataTransfer.setData('application/threadmed-folder', folder.id)
+                            }}
+                            onDragOver={(e) => {
+                                if (e.dataTransfer.types.includes('application/threadmed-paper') || e.dataTransfer.types.includes('application/threadmed-folder')) {
+                                    e.preventDefault()
+                                    e.dataTransfer.dropEffect = 'move'
+                                    setDragOverFolderId(folder.id)
+                                }
+                            }}
+                            onDragLeave={() => setDragOverFolderId(null)}
+                            onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                            onClick={() => onFolderSelect(folder.id)}
+                            className={cn(
+                                "flex items-center gap-3 p-4 rounded-xl border transition-all text-left group",
+                                dragOverFolderId === folder.id
+                                    ? "bg-[var(--color-accent-subtle)] border-[var(--color-accent)] border-dashed"
+                                    : "bg-[var(--color-bg-elevated)] border-[var(--color-border-subtle)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-subtle)]"
+                            )}
+                        >
+                            <div className="w-10 h-10 rounded-lg bg-[var(--color-bg-active)] flex items-center justify-center shrink-0 group-hover:bg-[var(--color-accent)]/20 transition-colors">
+                                <FolderIcon size={18} className="text-[var(--color-text-tertiary)] group-hover:text-[var(--color-accent)] transition-colors" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] leading-snug truncate group-hover:text-[var(--color-accent)] transition-colors">
+                                    {folder.name}
+                                </h3>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {papers.map((paper) => (
                 <div
                     key={paper.id}
+                    draggable
+                    onDragStart={(e) => {
+                        e.dataTransfer.setData('application/threadmed-paper', paper.id)
+                        if (currentFolder) {
+                            e.dataTransfer.setData('application/threadmed-source-folder', currentFolder.id)
+                        }
+                    }}
                     className="w-full text-left p-5 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-hover)] transition-all group hover:-translate-y-0.5 active:translate-y-0 relative cursor-pointer"
                     onClick={() => onPaperSelect(paper.id)}
                 >
@@ -234,6 +406,21 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
                                 {paper.year ? ` · ${paper.year} ` : ''}
                                 {paper.journal ? ` · ${paper.journal} ` : ''}
                             </p>
+                            {/* Folder Badges */}
+                            {paperFoldersMap[paper.id] && paperFoldersMap[paper.id].length > 0 && (
+                                <div className="flex items-center gap-1.5 pt-0.5">
+                                    {paperFoldersMap[paper.id].map(fId => {
+                                        const fName = folders.find(f => f.id === fId)?.name
+                                        if (!fName) return null
+                                        return (
+                                            <span key={fId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-bg-active)] border border-[var(--color-border-subtle)] text-[10px] text-[var(--color-text-tertiary)]">
+                                                <FolderIcon size={9} />
+                                                <span className="truncate max-w-[100px]">{fName}</span>
+                                            </span>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
                         <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             <button
@@ -260,6 +447,31 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onNavigate }: Lib
                     </div>
                 </div>
             ))}
+
+            {/* Folder Empty State */}
+            {currentFolder && papers.length === 0 && subfolders.length === 0 && (
+                <div
+                    className={cn(
+                        "flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-2xl transition-all mt-4",
+                        dragOverFolderId === currentFolder.id
+                            ? "border-[var(--color-accent)] bg-[var(--color-accent-subtle)]"
+                            : "border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]/50 opacity-80"
+                    )}
+                    onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes('application/threadmed-paper') || e.dataTransfer.types.includes('application/threadmed-folder')) {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                            setDragOverFolderId(currentFolder.id)
+                        }
+                    }}
+                    onDragLeave={() => setDragOverFolderId(null)}
+                    onDrop={(e) => handleDropOnFolder(e, currentFolder.id)}
+                >
+                    <FolderIcon size={42} className={cn("mb-3 transition-opacity", dragOverFolderId === currentFolder.id ? "text-[var(--color-accent)] opacity-100" : "opacity-30")} />
+                    <p className="text-[14px] font-medium text-[var(--color-text-secondary)]">This folder is empty</p>
+                    <p className="text-[13px] mt-1 text-[var(--color-text-tertiary)]">Drag papers or folders here to organize.</p>
+                </div>
+            )}
 
             <PaperDialog
                 isOpen={isDialogOpen}

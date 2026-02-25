@@ -18,11 +18,12 @@ export interface ThreadMedAPI {
     folders: {
         list: () => Promise<Folder[]>
         create: (name: string, parentId?: string) => Promise<Folder>
-        update: (id: string, name: string) => Promise<void>
+        update: (id: string, updates: { name?: string, parent_id?: string | null }) => Promise<void>
         delete: (id: string) => Promise<void>
         addPaper: (paperId: string, folderId: string) => Promise<void>
         removePaper: (paperId: string, folderId: string) => Promise<void>
         getPapers: (folderId: string) => Promise<PaperWithAuthors[]>
+        getMappings: () => Promise<Array<{ paper_id: string, folder_id: string }>>
     }
     nodes: {
         list: () => Promise<Node[]>

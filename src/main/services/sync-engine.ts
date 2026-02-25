@@ -24,6 +24,8 @@ import {
     getSyncMeta, setSyncMeta
 } from './credential-store'
 import { upsertPaper, updatePaperFullText } from '../database/repositories/papers'
+import fs from 'fs'
+import path from 'path'
 import { getDb } from '../database/connection'
 import { getPdfDir } from '../database/connection'
 
@@ -142,12 +144,37 @@ export async function syncLibrary(): Promise<SyncResult> {
         const client = new ZoteroClient(apiKey, userId)
         const sinceVersion = parseInt(getSyncMeta('library_version') || '0', 10)
 
-        // ── Phase 1: Fetch metadata ──────────────────────────────────────
+        // ── Phase 1: Missing Items Recovery Check ────────────────────────
         emitProgress({ phase: 'metadata', current: 0, total: 0 })
+        console.log('[Sync] Checking for missing remote items...')
+
+        const allRemoteKeys = await client.fetchAllKeys()
+        const db = getDb()
+        const localRecords = db.prepare('SELECT zotero_key FROM papers WHERE zotero_key IS NOT NULL').all() as { zotero_key: string }[]
+        const localKeys = new Set(localRecords.map(r => r.zotero_key))
+
+        const missingKeys = allRemoteKeys.filter(k => !localKeys.has(k))
+
+
+
+        // ── Phase 2: Fetch metadata ──────────────────────────────────────
         console.log(`[Sync] Fetching items since version ${sinceVersion}...`)
 
         const items = await client.fetchItems(sinceVersion)
-        console.log(`[Sync] Got ${items.length} items from Zotero`)
+        console.log(`[Sync] Got ${items.length} items from Zotero incremental sync`)
+
+        if (missingKeys.length > 0) {
+            console.log(`[Sync] Appending ${missingKeys.length} explicitly recovered items...`)
+            try {
+                for (let i = 0; i < missingKeys.length; i += 50) {
+                    const chunk = missingKeys.slice(i, i + 50)
+                    const recoveredItems = await client.fetchItemsByKeys(chunk)
+                    items.push(...recoveredItems)
+                }
+            } catch (err) {
+                console.error('[Sync] Missing items recovery fetch failed:', err)
+            }
+        }
 
         // Filter to actual papers (journal articles, book sections, etc.)
         const papers = items.filter(item => {

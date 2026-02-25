@@ -6,8 +6,9 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react'
-import { Sun, Moon, Database, FolderOpen, Info, RefreshCw, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { Sun, Moon, Database, FolderOpen, Info, RefreshCw, CheckCircle2, XCircle, Loader2, Link as LinkIcon, DownloadCloud, Activity, AlertCircle } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
+import { triggerDataRefresh } from '@/lib/events'
 import { cn } from '@/lib/utils'
 import type { ZoteroStatus, SyncProgress, SyncResult, ConnectResult } from '@/types'
 
@@ -129,6 +130,7 @@ export function SettingsView() {
         try {
             const result = await window.api.zotero.sync() as SyncResult
             setLastSyncResult(result)
+            triggerDataRefresh()
             await loadZoteroStatus()
         } catch (err) {
             console.error('[Settings] Sync failed:', err)
@@ -138,7 +140,7 @@ export function SettingsView() {
         }
     }
 
-    const themeOptions: Array<{ value: ThemeOption; label: string; icon: React.ReactNode; desc: string }> = [
+    const themeOptions: Array<{ value: 'light' | 'dark'; label: string; icon: React.ReactNode; desc: string }> = [
         { value: 'dark', label: 'Dark', icon: <Moon size={18} />, desc: 'Easy on the eyes for long reading sessions' },
         { value: 'light', label: 'Light', icon: <Sun size={18} />, desc: 'Clean and bright for daytime use' }
     ]

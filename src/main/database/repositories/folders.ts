@@ -47,9 +47,29 @@ export function listFolders(): Folder[] {
 }
 
 /** Rename or update a folder */
-export function updateFolder(id: string, name: string): void {
+export function updateFolder(id: string, updates: { name?: string, parent_id?: string | null }): void {
     const db = getDb()
-    db.prepare('UPDATE folders SET name = ? WHERE id = ?').run(name, id)
+
+    // Build dynamic update
+    const setDocs: string[] = []
+    const values: any[] = []
+
+    if (updates.name !== undefined) {
+        setDocs.push('name = ?')
+        values.push(updates.name)
+    }
+
+    // We explicitly allow parent_id to be null
+    if (updates.hasOwnProperty('parent_id')) {
+        setDocs.push('parent_id = ?')
+        values.push(updates.parent_id)
+    }
+
+    if (setDocs.length === 0) return
+
+    values.push(id) // For the WHERE clause
+
+    db.prepare(`UPDATE folders SET ${setDocs.join(', ')} WHERE id = ?`).run(...values)
 }
 
 /** Delete a folder (cascades to paper_folders and child folders) */
@@ -79,4 +99,10 @@ export function getPapersInFolder(folderId: string): PaperWithAuthors[] {
     const rows = db.prepare('SELECT paper_id FROM paper_folders WHERE folder_id = ?').all(folderId) as { paper_id: string }[]
 
     return rows.map(r => getPaper(r.paper_id)).filter((p): p is PaperWithAuthors => p !== null)
+}
+
+/** Get all folder-to-paper links */
+export function getPaperMappings(): Array<{ paper_id: string, folder_id: string }> {
+    const db = getDb()
+    return db.prepare('SELECT paper_id, folder_id FROM paper_folders').all() as Array<{ paper_id: string, folder_id: string }>
 }
