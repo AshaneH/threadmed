@@ -7,7 +7,7 @@ A literature synthesis workbench for evidence-based medicine. Import papers from
 | Tool | Version | Notes |
 |------|---------|-------|
 | **Node.js** | ≥ 18 | Tested with 20.x and 25.x |
-| **Python** | 3.10 – 3.12 | Required by node-gyp to compile `better-sqlite3` |
+| **Python** | ≥ 3.10 | Required by node-gyp to compile `better-sqlite3`. node-gyp v10+ supports 3.12+; if npm bundles an older node-gyp, install `node-gyp` globally |
 | **C++ Build Tools** | VS 2022 | Windows only — install via Visual Studio Installer |
 | **Windows SDK** | 10.0.22621+ | Included in "Desktop development with C++" workload |
 
@@ -15,7 +15,7 @@ A literature synthesis workbench for evidence-based medicine. Import papers from
 
 1. Install [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 2. In the installer, check **"Desktop development with C++"** (includes Windows SDK)
-3. Ensure Python 3.10–3.12 is installed (node-gyp does not support 3.13+)
+3. Ensure Python 3 is installed and on your PATH
 
 ### macOS / Linux
 
