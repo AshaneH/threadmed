@@ -26,3 +26,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Debug artifacts
+rebuild*.log
+rebuild_error.txt
+diff*.txt
