@@ -16,7 +16,7 @@ function App() {
     function renderView() {
         switch (activeView) {
             case 'library':
-                return <LibraryView onPaperSelect={(id) => { setSelectedPaperId(id); setActiveView('paper') }} />
+                return <LibraryView onPaperSelect={(id) => { setSelectedPaperId(id); setActiveView('paper') }} onNavigate={(view) => setActiveView(view as ViewId)} />
             case 'matrix':
                 return (
                     <div className="flex items-center justify-center h-full text-[var(--color-text-tertiary)]">

@@ -8,9 +8,10 @@ import type { Paper } from '@/types'
 
 interface LibraryViewProps {
     onPaperSelect: (id: string) => void
+    onNavigate: (view: string) => void
 }
 
-export function LibraryView({ onPaperSelect }: LibraryViewProps) {
+export function LibraryView({ onPaperSelect, onNavigate }: LibraryViewProps) {
     const [papers, setPapers] = useState<Paper[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -108,7 +109,10 @@ export function LibraryView({ onPaperSelect }: LibraryViewProps) {
 
                     {/* Action Buttons */}
                     <div className="flex gap-5 justify-center pt-1">
-                        <button className="flex items-center gap-3 px-8 py-3.5 rounded-xl bg-[var(--color-accent)] text-white text-[14px] font-semibold hover:bg-[var(--color-accent-hover)] transition-all shadow-lg shadow-[var(--color-accent)]/20 hover:shadow-xl hover:shadow-[var(--color-accent)]/30 hover:-translate-y-0.5 active:translate-y-0">
+                        <button
+                            onClick={() => onNavigate('settings')}
+                            className="flex items-center gap-3 px-8 py-3.5 rounded-xl bg-[var(--color-accent)] text-white text-[14px] font-semibold hover:bg-[var(--color-accent-hover)] transition-all shadow-lg shadow-[var(--color-accent)]/20 hover:shadow-xl hover:shadow-[var(--color-accent)]/30 hover:-translate-y-0.5 active:translate-y-0"
+                        >
                             <ExternalLink size={16} />
                             Connect Zotero
                         </button>

@@ -7,6 +7,10 @@
 // 3. Download PDF attachments
 // 4. Extract full text → FTS5 index
 // Emits progress events to the renderer via IPC.
+//
+// SECURITY: API key is encrypted at rest via credential-store.ts and NEVER
+// sent to the renderer process. Only the connection status (boolean) and
+// user ID are exposed to the UI.
 // ============================================================================
 
 import { join } from 'path'
@@ -15,24 +19,13 @@ import { BrowserWindow } from 'electron'
 import { ZoteroClient, type ZoteroItem } from './zotero-client'
 import { generatePdfFilename } from './pdf-namer'
 import { extractTextFromPdf } from './pdf-extractor'
+import {
+    storeApiKey, retrieveApiKey, clearApiKey,
+    getSyncMeta, setSyncMeta
+} from './credential-store'
 import { upsertPaper, updatePaperFullText } from '../database/repositories/papers'
 import { getDb } from '../database/connection'
 import { getPdfDir } from '../database/connection'
-
-// ── Sync Meta Helpers ────────────────────────────────────────────────────────
-
-function getSyncMeta(key: string): string | null {
-    const db = getDb()
-    const row = db.prepare('SELECT value FROM sync_meta WHERE key = ?').get(key) as { value: string } | undefined
-    return row?.value ?? null
-}
-
-function setSyncMeta(key: string, value: string): void {
-    const db = getDb()
-    db.prepare(
-        'INSERT INTO sync_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?'
-    ).run(key, value, value)
-}
 
 // ── Progress Emitter ─────────────────────────────────────────────────────────
 
@@ -56,12 +49,13 @@ function emitProgress(progress: SyncProgress): void {
 export interface ZoteroStatus {
     connected: boolean
     userId: string | null
+    // NOTE: API key is NEVER included here — it must not reach the renderer
     lastSync: string | null
     libraryVersion: number | null
 }
 
 export function getZoteroStatus(): ZoteroStatus {
-    const apiKey = getSyncMeta('zotero_api_key')
+    const apiKey = retrieveApiKey()
     const userId = getSyncMeta('zotero_user_id')
     const lastSync = getSyncMeta('last_sync')
     const libVersion = getSyncMeta('library_version')
@@ -80,22 +74,39 @@ export async function connectZotero(
     apiKey: string,
     userId: string
 ): Promise<{ valid: boolean; totalItems: number; error?: string }> {
-    const client = new ZoteroClient(apiKey, userId)
+    // Input validation
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+        return { valid: false, totalItems: 0, error: 'API key is required' }
+    }
+    if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        return { valid: false, totalItems: 0, error: 'User ID is required' }
+    }
+    // Sanitize: User ID should be numeric
+    const sanitizedUserId = userId.trim()
+    if (!/^\d+$/.test(sanitizedUserId)) {
+        return { valid: false, totalItems: 0, error: 'User ID must be numeric' }
+    }
+    const sanitizedApiKey = apiKey.trim()
+
+    const client = new ZoteroClient(sanitizedApiKey, sanitizedUserId)
     const result = await client.validateCredentials()
 
     if (result.valid) {
-        setSyncMeta('zotero_api_key', apiKey)
-        setSyncMeta('zotero_user_id', userId)
-        console.log(`[Sync] Connected to Zotero (${result.totalItems} items)`)
+        // Store API key encrypted, user ID in plaintext (non-sensitive)
+        storeApiKey(sanitizedApiKey)
+        setSyncMeta('zotero_user_id', sanitizedUserId)
+        console.log('[Sync] Connected to Zotero (credentials encrypted)')
     }
 
+    // SECURITY: Never return the API key in the result
     return result
 }
 
 export function disconnectZotero(): void {
+    clearApiKey()
     const db = getDb()
-    db.prepare("DELETE FROM sync_meta WHERE key IN ('zotero_api_key', 'zotero_user_id', 'library_version', 'last_sync')").run()
-    console.log('[Sync] Disconnected from Zotero')
+    db.prepare("DELETE FROM sync_meta WHERE key IN ('zotero_user_id', 'library_version', 'last_sync')").run()
+    console.log('[Sync] Disconnected from Zotero (credentials cleared)')
 }
 
 // ── Sync Guard ───────────────────────────────────────────────────────────────
@@ -117,7 +128,7 @@ export async function syncLibrary(): Promise<SyncResult> {
         return { imported: 0, updated: 0, pdfsDownloaded: 0, errors: ['Sync already in progress'], libraryVersion: 0 }
     }
 
-    const apiKey = getSyncMeta('zotero_api_key')
+    const apiKey = retrieveApiKey()
     const userId = getSyncMeta('zotero_user_id')
 
     if (!apiKey || !userId) {

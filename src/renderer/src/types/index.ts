@@ -70,11 +70,10 @@ export interface SearchResult {
 /** Navigation view identifiers */
 export type ViewId = 'library' | 'matrix' | 'search' | 'memos' | 'paper' | 'settings'
 
-/** Zotero connection status */
+/** Zotero connection status (NOTE: API key is intentionally excluded — never sent to renderer) */
 export interface ZoteroStatus {
     connected: boolean
     userId: string | null
-    apiKey: string | null
     lastSync: string | null
     libraryVersion: number | null
 }
