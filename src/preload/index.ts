@@ -25,8 +25,20 @@ const api = {
         }) => ipcRenderer.invoke('papers:create', input),
         count: () => ipcRenderer.invoke('papers:count'),
         search: (query: string, limit?: number) => ipcRenderer.invoke('papers:search', query, limit),
-        updateFullText: (id: string, fullText: string) =>
-            ipcRenderer.invoke('papers:updateFullText', id, fullText)
+        updateFullText: (id: string, text: string) => ipcRenderer.invoke('papers:updateFullText', id, text),
+        delete: (id: string) => ipcRenderer.invoke('papers:delete', id),
+        update: (id: string, updates: unknown) => ipcRenderer.invoke('papers:update', id, updates)
+    },
+
+    // ── Folders ────────────────────────────────────────────────────────────
+    folders: {
+        list: () => ipcRenderer.invoke('folders:list'),
+        create: (name: string, parentId?: string) => ipcRenderer.invoke('folders:create', name, parentId),
+        update: (id: string, name: string) => ipcRenderer.invoke('folders:update', id, name),
+        delete: (id: string) => ipcRenderer.invoke('folders:delete', id),
+        addPaper: (paperId: string, folderId: string) => ipcRenderer.invoke('folders:addPaper', paperId, folderId),
+        removePaper: (paperId: string, folderId: string) => ipcRenderer.invoke('folders:removePaper', paperId, folderId),
+        getPapers: (folderId: string) => ipcRenderer.invoke('folders:getPapers', folderId)
     },
 
     // ── Nodes ──────────────────────────────────────────────────────────────

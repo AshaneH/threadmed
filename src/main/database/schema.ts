@@ -37,6 +37,21 @@ export function runSchema(db: Database.Database): void {
       PRIMARY KEY (paper_id, author_id)
     );
 
+    -- ─── Folders (Collections) ────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS folders (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      parent_id  TEXT REFERENCES folders(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS paper_folders (
+      paper_id  TEXT NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
+      folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+      PRIMARY KEY (paper_id, folder_id)
+    );
+
     -- ─── Nodes (Thematic Codes) ──────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS nodes (
       id         TEXT PRIMARY KEY,
@@ -84,6 +99,9 @@ export function runSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_annotations_node ON annotations(node_id);
     CREATE INDEX IF NOT EXISTS idx_memo_references_memo ON memo_references(memo_id);
     CREATE INDEX IF NOT EXISTS idx_memo_references_annotation ON memo_references(annotation_id);
+    CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_paper_folders_paper ON paper_folders(paper_id);
+    CREATE INDEX IF NOT EXISTS idx_paper_folders_folder ON paper_folders(folder_id);
 
     -- ─── Sync Metadata (key-value store) ──────────────────────────────────
     CREATE TABLE IF NOT EXISTS sync_meta (

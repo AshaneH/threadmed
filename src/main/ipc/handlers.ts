@@ -11,6 +11,8 @@ import { listNodes, createNode, updateNode, deleteNode } from '../database/repos
 import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation } from '../database/repositories/annotations'
 import { getDbPath, getPdfDir } from '../database/connection'
 import { connectZotero, disconnectZotero, getZoteroStatus, syncLibrary } from '../services/sync-engine'
+import { listFolders, createFolder, updateFolder, deleteFolder, addPaperToFolder, removePaperFromFolder, getPapersInFolder } from '../database/repositories/folders'
+import { deletePaper, updatePaper } from '../database/repositories/papers'
 import type { CreatePaperInput } from '../database/repositories/papers'
 import type { CreateAnnotationInput } from '../database/repositories/annotations'
 
@@ -38,6 +40,43 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('papers:updateFullText', (_event, id: string, fullText: string) => {
         return updatePaperFullText(id, fullText)
+    })
+
+    ipcMain.handle('papers:delete', (_event, id: string) => {
+        return deletePaper(id)
+    })
+
+    ipcMain.handle('papers:update', (_event, id: string, updates: Partial<CreatePaperInput>) => {
+        return updatePaper(id, updates)
+    })
+
+    // ── Folder Handlers ──────────────────────────────────────────────────────
+    ipcMain.handle('folders:list', () => {
+        return listFolders()
+    })
+
+    ipcMain.handle('folders:create', (_event, name: string, parentId?: string) => {
+        return createFolder(name, parentId)
+    })
+
+    ipcMain.handle('folders:update', (_event, id: string, name: string) => {
+        return updateFolder(id, name)
+    })
+
+    ipcMain.handle('folders:delete', (_event, id: string) => {
+        return deleteFolder(id)
+    })
+
+    ipcMain.handle('folders:addPaper', (_event, paperId: string, folderId: string) => {
+        return addPaperToFolder(paperId, folderId)
+    })
+
+    ipcMain.handle('folders:removePaper', (_event, paperId: string, folderId: string) => {
+        return removePaperFromFolder(paperId, folderId)
+    })
+
+    ipcMain.handle('folders:getPapers', (_event, folderId: string) => {
+        return getPapersInFolder(folderId)
     })
 
     // ── Node Handlers ────────────────────────────────────────────────────────

@@ -3,7 +3,9 @@
 // ============================================================================
 
 import { v4 as uuidv4 } from 'uuid'
-import { getDb } from '../connection'
+import { join } from 'path'
+import { unlinkSync, existsSync } from 'fs'
+import { getDb, getPdfDir } from '../connection'
 
 export interface Paper {
     id: string
@@ -190,6 +192,60 @@ export function upsertPaper(input: CreatePaperInput & { zotero_version?: number 
     // Insert new paper
     const paper = createPaper(input)
     return paper.id
+}
+
+/** 
+ * Delete a paper from the database (cascades to annotations/tags/folders) 
+ * and remove its PDF file from disk.
+ */
+export function deletePaper(id: string): void {
+    const db = getDb()
+
+    // Get pdf_filename before deleting the record
+    const paper = db.prepare('SELECT pdf_filename FROM papers WHERE id = ?').get(id) as { pdf_filename: string | null } | undefined
+
+    // Delete from database (cascades handle related records)
+    db.prepare('DELETE FROM papers WHERE id = ?').run(id)
+
+    // Delete PDF from disk if it exists
+    if (paper?.pdf_filename) {
+        const pdfPath = join(getPdfDir(), paper.pdf_filename)
+        if (existsSync(pdfPath)) {
+            try {
+                unlinkSync(pdfPath)
+                console.log(`[Papers] Deleted PDF: ${paper.pdf_filename}`)
+            } catch (err) {
+                console.error(`[Papers] Failed to delete PDF file ${pdfPath}:`, err)
+            }
+        }
+    }
+}
+
+/** 
+ * Manually update a paper's metadata. 
+ */
+export function updatePaper(id: string, updates: Partial<CreatePaperInput>): void {
+    const db = getDb()
+
+    const setClauses: string[] = []
+    const values: any[] = []
+
+    if (updates.title !== undefined) { setClauses.push('title = ?'); values.push(updates.title) }
+    if (updates.year !== undefined) { setClauses.push('year = ?'); values.push(updates.year) }
+    if (updates.doi !== undefined) { setClauses.push('doi = ?'); values.push(updates.doi) }
+    if (updates.journal !== undefined) { setClauses.push('journal = ?'); values.push(updates.journal) }
+    if (updates.abstract !== undefined) { setClauses.push('abstract = ?'); values.push(updates.abstract) }
+
+    if (setClauses.length > 0) {
+        setClauses.push("date_modified = datetime('now')")
+        const stmt = `UPDATE papers SET ${setClauses.join(', ')} WHERE id = ?`
+        db.prepare(stmt).run(...values, id)
+    }
+
+    if (updates.authors) {
+        db.prepare('DELETE FROM paper_authors WHERE paper_id = ?').run(id)
+        insertAuthorsForPaper(db, id, updates.authors)
+    }
 }
 
 /** Helper: insert authors for a paper */

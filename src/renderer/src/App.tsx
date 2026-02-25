@@ -12,11 +12,18 @@ import type { ViewId } from './types'
 function App() {
     const [activeView, setActiveView] = useState<ViewId>('library')
     const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null)
+    const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
 
     function renderView() {
         switch (activeView) {
             case 'library':
-                return <LibraryView onPaperSelect={(id) => { setSelectedPaperId(id); setActiveView('paper') }} onNavigate={(view) => setActiveView(view as ViewId)} />
+                return (
+                    <LibraryView
+                        selectedFolderId={selectedFolderId}
+                        onPaperSelect={(id) => { setSelectedPaperId(id); setActiveView('paper') }}
+                        onNavigate={(view) => setActiveView(view as ViewId)}
+                    />
+                )
             case 'matrix':
                 return (
                     <div className="flex items-center justify-center h-full text-[var(--color-text-tertiary)]">
@@ -67,9 +74,17 @@ function App() {
         <ThemeProvider>
             <AppShell
                 activeView={activeView}
-                onViewChange={setActiveView}
+                onViewChange={(view) => {
+                    setActiveView(view)
+                    if (view !== 'library') setSelectedFolderId(null)
+                }}
                 selectedPaperId={selectedPaperId}
                 onPaperSelect={setSelectedPaperId}
+                selectedFolderId={selectedFolderId}
+                onFolderSelect={(id) => {
+                    setSelectedFolderId(id)
+                    setActiveView('library')
+                }}
             >
                 {renderView()}
             </AppShell>

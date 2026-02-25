@@ -29,6 +29,53 @@ export interface Node {
 }
 
 /** A text highlight annotation linked to a paper and node */
+export interface Paper {
+    id: string
+    zotero_key: string | null
+    title: string
+    year: number | null
+    doi: string | null
+    journal: string | null
+    abstract: string | null
+    pdf_filename: string | null
+    full_text: string | null
+    date_added: string
+    date_modified: string
+    zotero_version: number
+}
+
+export interface PaperWithAuthors extends Paper {
+    authors: string[]
+}
+
+export interface CreatePaperInput {
+    title: string
+    year?: number | null
+    doi?: string | null
+    journal?: string | null
+    abstract?: string | null
+    pdf_filename?: string | null
+    zotero_key?: string | null
+    authors?: string[]
+}
+
+export interface Node {
+    id: string
+    name: string
+    color: string
+    is_default: number
+    sort_order: number
+}
+
+export interface CreateAnnotationInput {
+    paper_id: string
+    node_id: string
+    content: string
+    page_number: number
+    rects_json?: string | null
+    color?: string | null
+}
+
 export interface Annotation {
     id: string
     paper_id: string
@@ -39,6 +86,17 @@ export interface Annotation {
     color: string | null
     created_at: string
 }
+
+/** Folder / Collection */
+export interface Folder {
+    id: string
+    name: string
+    parent_id: string | null
+    created_at: string
+    sort_order: number
+}
+
+// ── Application State ────────────────────────────────────────────────────────
 
 /** Annotation with paper and node context */
 export interface AnnotationWithContext extends Annotation {

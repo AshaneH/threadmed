@@ -14,6 +14,8 @@ interface AppShellProps {
     onViewChange: (view: ViewId) => void
     selectedPaperId: string | null
     onPaperSelect: (paperId: string) => void
+    selectedFolderId: string | null
+    onFolderSelect: (folderId: string | null) => void
     children: React.ReactNode
 }
 
@@ -22,6 +24,8 @@ export function AppShell({
     onViewChange,
     selectedPaperId,
     onPaperSelect,
+    selectedFolderId,
+    onFolderSelect,
     children
 }: AppShellProps) {
 
@@ -52,6 +56,8 @@ export function AppShell({
                             onViewChange={onViewChange}
                             onPaperSelect={onPaperSelect}
                             selectedPaperId={selectedPaperId}
+                            selectedFolderId={selectedFolderId}
+                            onFolderSelect={onFolderSelect}
                         />
                     </Panel>
 

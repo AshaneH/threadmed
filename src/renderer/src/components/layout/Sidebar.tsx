@@ -20,13 +20,16 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/context/ThemeContext'
-import type { ViewId, Node, Paper } from '@/types'
+import { Folder as FolderIcon } from 'lucide-react'
+import type { ViewId, Node, Paper, Folder } from '@/types'
 
 interface SidebarProps {
     activeView: ViewId
     onViewChange: (view: ViewId) => void
     onPaperSelect: (paperId: string) => void
     selectedPaperId: string | null
+    selectedFolderId: string | null
+    onFolderSelect: (folderId: string | null) => void
 }
 
 interface NavItemProps {
@@ -62,11 +65,18 @@ function NavItem({ icon, label, isActive, onClick, badge, trailing }: NavItemPro
     )
 }
 
-export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaperId }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaperId, selectedFolderId, onFolderSelect }: SidebarProps) {
     const [papers, setPapers] = useState<Paper[]>([])
     const [nodes, setNodes] = useState<Node[]>([])
+    const [folders, setFolders] = useState<Folder[]>([])
+
+    // UI state
     const [libraryExpanded, setLibraryExpanded] = useState(true)
+    const [foldersExpanded, setFoldersExpanded] = useState(true)
     const [nodesExpanded, setNodesExpanded] = useState(true)
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+    const [newFolderName, setNewFolderName] = useState('')
+
     const { theme, toggleTheme } = useTheme()
 
     useEffect(() => {
@@ -76,12 +86,14 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
     async function loadData() {
         try {
             if (!window.api) return
-            const [paperList, nodeList] = await Promise.all([
+            const [paperList, nodeList, folderList] = await Promise.all([
                 window.api.papers.list(),
-                window.api.nodes.list()
+                window.api.nodes.list(),
+                window.api.folders.list()
             ])
             setPapers(paperList)
             setNodes(nodeList)
+            setFolders(folderList)
         } catch (err) {
             console.error('[Sidebar] Failed to load data:', err)
         }
@@ -141,6 +153,73 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                 {/* ── Divider ─────────────────────────────────────────────────── */}
                 <div className="h-px bg-[var(--color-border-subtle)] mb-6" />
 
+                {/* ── Folders (Collections) ───────────────────────────────────── */}
+                <div className="mb-6">
+                    <button
+                        onClick={() => setFoldersExpanded(!foldersExpanded)}
+                        className="flex items-center gap-2 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors w-full no-drag"
+                    >
+                        {foldersExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        Collections
+                    </button>
+                    {foldersExpanded && (
+                        <div className="mt-2 space-y-1">
+                            {folders.map((folder) => (
+                                <button
+                                    key={folder.id}
+                                    onClick={() => onFolderSelect(folder.id)}
+                                    className={cn(
+                                        'flex items-center gap-3 w-full px-4 py-2 rounded-lg text-[12px] transition-all no-drag text-left',
+                                        'hover:bg-[var(--color-bg-hover)]',
+                                        selectedFolderId === folder.id && activeView === 'library'
+                                            ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)] font-medium'
+                                            : 'text-[var(--color-text-secondary)]'
+                                    )}
+                                >
+                                    <FolderIcon size={13} className={cn("shrink-0", selectedFolderId === folder.id ? "text-[var(--color-accent)]" : "opacity-40")} />
+                                    <span className="truncate flex-1">{folder.name}</span>
+                                </button>
+                            ))}
+
+                            {isCreatingFolder ? (
+                                <div className="px-4 py-1">
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        value={newFolderName}
+                                        onChange={(e) => setNewFolderName(e.target.value)}
+                                        onKeyDown={async (e) => {
+                                            if (e.key === 'Enter' && newFolderName.trim()) {
+                                                await window.api.folders.create(newFolderName.trim())
+                                                setNewFolderName('')
+                                                setIsCreatingFolder(false)
+                                                loadData() // Refresh list
+                                            } else if (e.key === 'Escape') {
+                                                setIsCreatingFolder(false)
+                                                setNewFolderName('')
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            setIsCreatingFolder(false)
+                                            setNewFolderName('')
+                                        }}
+                                        placeholder="Folder name..."
+                                        className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-2 py-1 text-[12px] outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/20"
+                                    />
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsCreatingFolder(true)}
+                                    className="flex items-center gap-3 px-4 py-2 text-[12px] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-subtle)] rounded-lg transition-all w-full no-drag"
+                                >
+                                    <Plus size={13} className="opacity-60" />
+                                    <span>New Collection</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* ── Papers List ─────────────────────────────────────────────── */}
                 <div className="mb-6">
                     <button
@@ -167,8 +246,8 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                                         className={cn(
                                             'flex items-center gap-3 w-full px-4 py-2 rounded-lg text-[12px] transition-all no-drag text-left',
                                             'hover:bg-[var(--color-bg-hover)]',
-                                            selectedPaperId === paper.id
-                                                ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
+                                            selectedPaperId === paper.id && activeView === 'paper'
+                                                ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)] font-medium'
                                                 : 'text-[var(--color-text-secondary)]'
                                         )}
                                     >
