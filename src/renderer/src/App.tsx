@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { AppShell } from './components/layout/AppShell'
 import { LibraryView } from './components/views/LibraryView'
+import { PaperView } from './components/views/PaperView'
 import { SettingsView } from './components/views/SettingsView'
 import type { ViewId } from './types'
 
@@ -53,17 +54,9 @@ function App() {
                     </div>
                 )
             case 'paper':
-                return (
-                    <div className="flex items-center justify-center h-full text-[var(--color-text-tertiary)]">
-                        <div className="text-center space-y-2">
-                            <p className="text-lg font-medium text-[var(--color-text-secondary)]">Paper Detail</p>
-                            <p className="text-sm">
-                                {selectedPaperId ? `Selected paper: ${selectedPaperId}` : 'No paper selected'}
-                            </p>
-                            <p className="text-sm">PDF viewer & annotations will be built in Phase 3</p>
-                        </div>
-                    </div>
-                )
+                return selectedPaperId
+                    ? <PaperView paperId={selectedPaperId} onBack={() => setActiveView('library')} />
+                    : null
             case 'settings':
                 return <SettingsView />
             default:

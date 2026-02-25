@@ -6,6 +6,8 @@
 // ============================================================================
 
 import { ipcMain } from 'electron'
+import * as fs from 'fs'
+import * as path from 'path'
 import { listPapers, getPaper, createPaper, getPaperCount, searchPapers, updatePaperFullText } from '../database/repositories/papers'
 import { listNodes, createNode, updateNode, deleteNode } from '../database/repositories/nodes'
 import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation } from '../database/repositories/annotations'
@@ -128,6 +130,15 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('system:pdfDir', () => {
         return getPdfDir()
+    })
+
+    // ── PDF File Handler ────────────────────────────────────────────────────
+    ipcMain.handle('papers:readPdf', (_event, paperId: string) => {
+        const paper = getPaper(paperId)
+        if (!paper?.pdf_filename) return null
+        const filePath = path.join(getPdfDir(), paper.pdf_filename)
+        if (!fs.existsSync(filePath)) return null
+        return fs.readFileSync(filePath)
     })
 
     // ── Zotero Handlers ──────────────────────────────────────────────────────

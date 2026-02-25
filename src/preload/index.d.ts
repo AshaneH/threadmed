@@ -14,6 +14,7 @@ export interface ThreadMedAPI {
         updateFullText: (id: string, text: string) => Promise<void>
         delete: (id: string) => Promise<void>
         update: (id: string, updates: Partial<CreatePaperInput>) => Promise<void>
+        readPdf: (id: string) => Promise<Buffer | null>
     }
     folders: {
         list: () => Promise<Folder[]>

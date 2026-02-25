@@ -27,7 +27,8 @@ const api = {
         search: (query: string, limit?: number) => ipcRenderer.invoke('papers:search', query, limit),
         updateFullText: (id: string, text: string) => ipcRenderer.invoke('papers:updateFullText', id, text),
         delete: (id: string) => ipcRenderer.invoke('papers:delete', id),
-        update: (id: string, updates: unknown) => ipcRenderer.invoke('papers:update', id, updates)
+        update: (id: string, updates: unknown) => ipcRenderer.invoke('papers:update', id, updates),
+        readPdf: (id: string) => ipcRenderer.invoke('papers:readPdf', id) as Promise<Buffer | null>
     },
 
     // ── Folders ────────────────────────────────────────────────────────────
