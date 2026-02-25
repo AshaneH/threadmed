@@ -9,7 +9,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "rebuild": "node-gyp rebuild --directory node_modules/better-sqlite3",
+    "rebuild": "node -e \"const v=require('./node_modules/electron/package.json').version; const {execSync}=require('child_process'); execSync('npx node-gyp rebuild --directory node_modules/better-sqlite3 --runtime=electron --target='+v+' --dist-url=https://electronjs.org/headers', {stdio:'inherit'})\"",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web"

@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react'
-import { Sun, Moon, Monitor, Database, FolderOpen, Info, Palette } from 'lucide-react'
+import { Sun, Moon, Database, FolderOpen, Info } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
 import { cn } from '@/lib/utils'
 

@@ -19,7 +19,8 @@ function createWindow(): void {
         show: false,
         title: 'ThreadMed',
         backgroundColor: '#0a0a0f',
-        titleBarStyle: 'hiddenInset',
+        ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+        frame: process.platform !== 'darwin',
         webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
@@ -49,10 +50,16 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
     // Initialize database (synchronous with better-sqlite3)
-    const dbPath = getDbPath()
-    console.log(`[ThreadMed] Database path: ${dbPath}`)
-    initDatabase()
-    console.log('[ThreadMed] Database initialized successfully')
+    try {
+        const dbPath = getDbPath()
+        console.log(`[ThreadMed] Database path: ${dbPath}`)
+        initDatabase()
+        console.log('[ThreadMed] Database initialized successfully')
+    } catch (err) {
+        console.error('[ThreadMed] FATAL: Database initialization failed:', err)
+        app.quit()
+        return
+    }
 
     // Register IPC handlers
     registerIpcHandlers()
