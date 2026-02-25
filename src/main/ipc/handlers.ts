@@ -5,7 +5,7 @@
 // repository layer and returns typed results to the renderer process.
 // ============================================================================
 
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import { listPapers, getPaper, createPaper, getPaperCount, searchPapers, updatePaperFullText } from '../database/repositories/papers'
@@ -130,6 +130,19 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('system:pdfDir', () => {
         return getPdfDir()
+    })
+
+    // ── Find-in-Page Handlers ───────────────────────────────────────────────
+    ipcMain.handle('find:start', (_event, text: string, options?: { forward?: boolean; findNext?: boolean }) => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (!win || !text) return null
+        return win.webContents.findInPage(text, options)
+    })
+
+    ipcMain.handle('find:stop', (_event, action?: 'clearSelection' | 'keepSelection' | 'activateSelection') => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (!win) return
+        win.webContents.stopFindInPage(action || 'clearSelection')
     })
 
     // ── PDF File Handler ────────────────────────────────────────────────────

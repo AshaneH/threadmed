@@ -70,8 +70,17 @@ const api = {
 
     // ── System ─────────────────────────────────────────────────────────────
     system: {
-        dbPath: () => ipcRenderer.invoke('system:dbPath'),
-        pdfDir: () => ipcRenderer.invoke('system:pdfDir')
+        getDbPath: () => ipcRenderer.invoke('system:dbPath'),
+        getPdfDir: () => ipcRenderer.invoke('system:pdfDir'),
+        checkFts5: () => ipcRenderer.invoke('system:checkFts5')
+    },
+
+    // ── Find ───────────────────────────────────────────────────────────────
+    find: {
+        start: (text: string, options?: { forward?: boolean; findNext?: boolean }) =>
+            ipcRenderer.invoke('find:start', text, options),
+        stop: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection') =>
+            ipcRenderer.invoke('find:stop', action)
     },
 
     // ── Zotero ─────────────────────────────────────────────────────────────

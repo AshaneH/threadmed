@@ -40,8 +40,13 @@ export interface ThreadMedAPI {
         delete: (id: string) => Promise<void>
     }
     system: {
-        dbPath: () => Promise<string>
-        pdfDir: () => Promise<string>
+        getDbPath: () => Promise<string>
+        getPdfDir: () => Promise<string>
+        checkFts5: () => Promise<boolean>
+    }
+    find: {
+        start: (text: string, options?: { forward?: boolean; findNext?: boolean }) => Promise<number | null>
+        stop: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection') => Promise<void>
     }
     zotero: {
         connect: (apiKey: string, userId: string) => Promise<{ valid: boolean; totalItems: number; error?: string }>
