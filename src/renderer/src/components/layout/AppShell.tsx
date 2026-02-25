@@ -83,40 +83,44 @@ export function AppShell({
                         </div>
                     </Panel>
 
-                    <PanelResizeHandle className="w-[1px] bg-[var(--color-border-subtle)] hover:bg-[var(--color-accent)] active:bg-[var(--color-accent)] transition-colors duration-150" />
+                    {activeView !== 'paper' && (
+                        <>
+                            <PanelResizeHandle className="w-[1px] bg-[var(--color-border-subtle)] hover:bg-[var(--color-accent)] active:bg-[var(--color-accent)] transition-colors duration-150" />
 
-                    {/* ── Right: Detail / PDF Pane ────────────────────────────────── */}
-                    <Panel
-                        defaultSize={32}
-                        minSize={20}
-                        maxSize={55}
-                        id="detail-pane"
-                        order={3}
-                    >
-                        <div className="h-full flex flex-col bg-[var(--color-bg-elevated)]">
-                            <div className="drag-region h-[52px] border-b border-[var(--color-border-subtle)] flex items-center px-6 shrink-0">
-                                <h2 className="text-[14px] font-semibold text-[var(--color-text-tertiary)] no-drag tracking-tight">
-                                    Document Preview
-                                </h2>
-                            </div>
-                            <div className="flex-1 flex items-center justify-center text-[var(--color-text-tertiary)] text-sm p-8">
-                                <div className="text-center space-y-4">
-                                    <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-active)] flex items-center justify-center mx-auto">
-                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-30">
-                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                            <polyline points="14 2 14 8 20 8" />
-                                            <line x1="16" y1="13" x2="8" y2="13" />
-                                            <line x1="16" y1="17" x2="8" y2="17" />
-                                        </svg>
+                            {/* ── Right: Detail / PDF Pane ────────────────────────────────── */}
+                            <Panel
+                                defaultSize={32}
+                                minSize={20}
+                                maxSize={55}
+                                id="detail-pane"
+                                order={3}
+                            >
+                                <div className="h-full flex flex-col bg-[var(--color-bg-elevated)]">
+                                    <div className="drag-region h-[52px] border-b border-[var(--color-border-subtle)] flex items-center px-6 shrink-0">
+                                        <h2 className="text-[14px] font-semibold text-[var(--color-text-tertiary)] no-drag tracking-tight">
+                                            Document Preview
+                                        </h2>
                                     </div>
-                                    <p className="text-[14px] font-medium text-[var(--color-text-secondary)]">Select a paper to preview</p>
-                                    <p className="text-[12px] text-[var(--color-text-tertiary)] opacity-60 leading-relaxed max-w-[200px] mx-auto">
-                                        PDF viewer and annotation tools will be available in Phase 3
-                                    </p>
+                                    <div className="flex-1 flex items-center justify-center text-[var(--color-text-tertiary)] text-sm p-8">
+                                        <div className="text-center space-y-4">
+                                            <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-active)] flex items-center justify-center mx-auto">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-30">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                    <polyline points="14 2 14 8 20 8" />
+                                                    <line x1="16" y1="13" x2="8" y2="13" />
+                                                    <line x1="16" y1="17" x2="8" y2="17" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-[14px] font-medium text-[var(--color-text-secondary)]">Select a paper to preview</p>
+                                            <p className="text-[12px] text-[var(--color-text-tertiary)] opacity-60 leading-relaxed max-w-[200px] mx-auto">
+                                                PDF viewer and annotation tools will be available in Phase 3
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </Panel>
+                            </Panel>
+                        </>
+                    )}
                 </PanelGroup>
             </div>
 

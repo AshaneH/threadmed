@@ -138,7 +138,8 @@ export function registerIpcHandlers(): void {
         if (!paper?.pdf_filename) return null
         const filePath = path.join(getPdfDir(), paper.pdf_filename)
         if (!fs.existsSync(filePath)) return null
-        return fs.readFileSync(filePath)
+        // Return as base64 string to avoid Electron's detached ArrayBuffer issue
+        return fs.readFileSync(filePath).toString('base64')
     })
 
     // ── Zotero Handlers ──────────────────────────────────────────────────────

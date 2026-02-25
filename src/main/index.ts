@@ -2,11 +2,13 @@
 // ThreadMed — Electron Main Process
 // ============================================================================
 
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, protocol, net } from 'electron'
 import { join } from 'path'
+import * as fs from 'fs'
 import { is } from '@electron-toolkit/utils'
-import { initDatabase, closeDatabase, getDbPath } from './database/connection'
+import { initDatabase, closeDatabase, getDbPath, getPdfDir } from './database/connection'
 import { registerIpcHandlers } from './ipc/handlers'
+import { getPaper } from './database/repositories/papers'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -64,6 +66,22 @@ app.whenReady().then(() => {
     // Register IPC handlers
     registerIpcHandlers()
     console.log('[ThreadMed] IPC handlers registered')
+
+    // Register custom protocol for serving PDF files to the renderer
+    protocol.handle('threadmed-pdf', (request) => {
+        const url = new URL(request.url)
+        const paperId = url.hostname || url.pathname.replace(/^\/+/, '')
+        const paper = getPaper(paperId)
+        if (!paper?.pdf_filename) {
+            return new Response('PDF not found', { status: 404 })
+        }
+        const filePath = join(getPdfDir(), paper.pdf_filename)
+        if (!fs.existsSync(filePath)) {
+            return new Response('File not found on disk', { status: 404 })
+        }
+        return net.fetch(`file://${filePath}`)
+    })
+    console.log('[ThreadMed] Custom PDF protocol registered')
 
     // Create the main window
     createWindow()
