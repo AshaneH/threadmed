@@ -84,6 +84,12 @@ export function runSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_annotations_node ON annotations(node_id);
     CREATE INDEX IF NOT EXISTS idx_memo_references_memo ON memo_references(memo_id);
     CREATE INDEX IF NOT EXISTS idx_memo_references_annotation ON memo_references(annotation_id);
+
+    -- ─── Sync Metadata (key-value store) ──────────────────────────────────
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 
   // Seed default EBM nodes (only if nodes table is empty)

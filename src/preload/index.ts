@@ -58,6 +58,21 @@ const api = {
     system: {
         dbPath: () => ipcRenderer.invoke('system:dbPath'),
         pdfDir: () => ipcRenderer.invoke('system:pdfDir')
+    },
+
+    // ── Zotero ─────────────────────────────────────────────────────────────
+    zotero: {
+        connect: (apiKey: string, userId: string) =>
+            ipcRenderer.invoke('zotero:connect', apiKey, userId),
+        disconnect: () => ipcRenderer.invoke('zotero:disconnect'),
+        status: () => ipcRenderer.invoke('zotero:status'),
+        sync: () => ipcRenderer.invoke('zotero:sync'),
+        onSyncProgress: (callback: (progress: unknown) => void) => {
+            ipcRenderer.on('zotero:sync-progress', (_event, progress) => callback(progress))
+        },
+        offSyncProgress: () => {
+            ipcRenderer.removeAllListeners('zotero:sync-progress')
+        }
     }
 }
 

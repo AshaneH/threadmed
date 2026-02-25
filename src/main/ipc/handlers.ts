@@ -10,6 +10,7 @@ import { listPapers, getPaper, createPaper, getPaperCount, searchPapers, updateP
 import { listNodes, createNode, updateNode, deleteNode } from '../database/repositories/nodes'
 import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation } from '../database/repositories/annotations'
 import { getDbPath, getPdfDir } from '../database/connection'
+import { connectZotero, disconnectZotero, getZoteroStatus, syncLibrary } from '../services/sync-engine'
 import type { CreatePaperInput } from '../database/repositories/papers'
 import type { CreateAnnotationInput } from '../database/repositories/annotations'
 
@@ -85,4 +86,22 @@ export function registerIpcHandlers(): void {
     ipcMain.handle('system:pdfDir', () => {
         return getPdfDir()
     })
+
+    // ── Zotero Handlers ──────────────────────────────────────────────────────
+    ipcMain.handle('zotero:connect', (_event, apiKey: string, userId: string) => {
+        return connectZotero(apiKey, userId)
+    })
+
+    ipcMain.handle('zotero:disconnect', () => {
+        return disconnectZotero()
+    })
+
+    ipcMain.handle('zotero:status', () => {
+        return getZoteroStatus()
+    })
+
+    ipcMain.handle('zotero:sync', () => {
+        return syncLibrary()
+    })
 }
+

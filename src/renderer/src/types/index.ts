@@ -69,3 +69,38 @@ export interface SearchResult {
 
 /** Navigation view identifiers */
 export type ViewId = 'library' | 'matrix' | 'search' | 'memos' | 'paper' | 'settings'
+
+/** Zotero connection status */
+export interface ZoteroStatus {
+    connected: boolean
+    userId: string | null
+    apiKey: string | null
+    lastSync: string | null
+    libraryVersion: number | null
+}
+
+/** Zotero connection result */
+export interface ConnectResult {
+    valid: boolean
+    totalItems: number
+    error?: string
+}
+
+/** Sync progress emitted during a sync operation */
+export interface SyncProgress {
+    phase: 'metadata' | 'downloading' | 'extracting' | 'complete' | 'error'
+    current: number
+    total: number
+    paperTitle?: string
+    error?: string
+}
+
+/** Final sync result */
+export interface SyncResult {
+    imported: number
+    updated: number
+    pdfsDownloaded: number
+    errors: string[]
+    libraryVersion: number
+}
+

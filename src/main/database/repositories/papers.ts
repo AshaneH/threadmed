@@ -145,3 +145,73 @@ export function searchPapers(query: string, limit = 50): Array<{
     LIMIT ?
   `).all(query, limit) as Array<{ id: string; title: string; snippet: string; rank: number }>
 }
+
+/**
+ * Upsert a paper from Zotero sync.
+ * If a paper with the same zotero_key exists, update its metadata.
+ * Otherwise, insert a new paper. Returns the paper ID.
+ */
+export function upsertPaper(input: CreatePaperInput & { zotero_version?: number }): string {
+    const db = getDb()
+
+    // Check if paper with this zotero_key already exists
+    if (input.zotero_key) {
+        const existing = db.prepare(
+            'SELECT id FROM papers WHERE zotero_key = ?'
+        ).get(input.zotero_key) as { id: string } | undefined
+
+        if (existing) {
+            // Update metadata
+            db.prepare(`
+                UPDATE papers SET
+                    title = ?, year = ?, doi = ?, journal = ?, abstract = ?,
+                    pdf_filename = COALESCE(?, pdf_filename),
+                    zotero_version = ?,
+                    date_modified = datetime('now')
+                WHERE zotero_key = ?
+            `).run(
+                input.title, input.year ?? null, input.doi ?? null,
+                input.journal ?? null, input.abstract ?? null,
+                input.pdf_filename ?? null, input.zotero_version ?? 0,
+                input.zotero_key
+            )
+
+            // Update authors if provided
+            if (input.authors && input.authors.length > 0) {
+                // Clear existing authors for this paper
+                db.prepare('DELETE FROM paper_authors WHERE paper_id = ?').run(existing.id)
+                insertAuthorsForPaper(db, existing.id, input.authors)
+            }
+
+            return existing.id
+        }
+    }
+
+    // Insert new paper
+    const paper = createPaper(input)
+    return paper.id
+}
+
+/** Helper: insert authors for a paper */
+function insertAuthorsForPaper(db: ReturnType<typeof getDb>, paperId: string, authors: string[]): void {
+    const findAuthor = db.prepare('SELECT id FROM authors WHERE name = ?')
+    const insertAuthor = db.prepare('INSERT INTO authors (id, name) VALUES (?, ?)')
+    const linkAuthor = db.prepare('INSERT INTO paper_authors (paper_id, author_id, position) VALUES (?, ?, ?)')
+
+    const addAuthors = db.transaction(() => {
+        for (let i = 0; i < authors.length; i++) {
+            const name = authors[i]
+            let authorId: string
+            const existing = findAuthor.get(name) as { id: string } | undefined
+            if (existing) {
+                authorId = existing.id
+            } else {
+                authorId = uuidv4()
+                insertAuthor.run(authorId, name)
+            }
+            linkAuthor.run(paperId, authorId, i)
+        }
+    })
+    addAuthors()
+}
+
