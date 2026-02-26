@@ -15,7 +15,8 @@
 
 import { app, dialog, BrowserWindow } from 'electron'
 import { join, basename } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, cpSync, readdirSync, renameSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, cpSync, renameSync } from 'fs'
+import { cp } from 'fs/promises'
 import { initDatabase, closeDatabase } from '../database/connection'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -246,8 +247,8 @@ export async function showSaveProjectAsDialog(parentWindow: BrowserWindow | null
     closeDatabase()
 
     try {
-        // Copy the whole directory structure
-        cpSync(current.path, newPath, { recursive: true })
+        // Copy the whole directory structure asynchronously (doesn't block UI)
+        await cp(current.path, newPath, { recursive: true })
         // Re-open from the new path
         return openProject(newPath)
     } catch (err) {
@@ -287,16 +288,13 @@ export function migrateIfNeeded(): Project | null {
         mkdirSync(migratedDir, { recursive: true })
         mkdirSync(join(migratedDir, 'pdfs'), { recursive: true })
 
-        // Step 2: Copy database
+        // Step 2: Copy database strictly
         cpSync(legacyDb, join(migratedDir, 'threadmed.db'))
 
-        // Step 3: Copy PDFs
+        // Step 3: Copy all PDFs efficiently using built-in recursive copy instead of a JS loop
         const legacyPdfDir = join(userDataPath, 'data', 'pdfs')
         if (existsSync(legacyPdfDir)) {
-            const pdfFiles = readdirSync(legacyPdfDir)
-            for (const file of pdfFiles) {
-                cpSync(join(legacyPdfDir, file), join(migratedDir, 'pdfs', file))
-            }
+            cpSync(legacyPdfDir, join(migratedDir, 'pdfs'), { recursive: true })
         }
 
         // Step 4: Verify — open the new DB and check paper count
