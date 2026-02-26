@@ -5,7 +5,7 @@
 // This is the only way the renderer can communicate with the main process.
 // ============================================================================
 
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 /** The API exposed to the renderer via window.api */
 const api = {
@@ -28,6 +28,8 @@ const api = {
         updateFullText: (id: string, text: string) => ipcRenderer.invoke('papers:updateFullText', id, text),
         delete: (id: string) => ipcRenderer.invoke('papers:delete', id),
         update: (id: string, updates: unknown) => ipcRenderer.invoke('papers:update', id, updates),
+        addPdf: (id: string, sourcePath: string) => ipcRenderer.invoke('papers:addPdf', id, sourcePath),
+        removePdf: (id: string) => ipcRenderer.invoke('papers:removePdf', id),
         readPdf: (id: string) => ipcRenderer.invoke('papers:readPdf', id) as Promise<Buffer | null>
     },
 
@@ -61,18 +63,35 @@ const api = {
             page_number: number
             rects_json?: string
             color?: string
+            tag_id?: string
         }) => ipcRenderer.invoke('annotations:create', input),
         forPaper: (paperId: string) => ipcRenderer.invoke('annotations:forPaper', paperId),
         forNode: (nodeId: string) => ipcRenderer.invoke('annotations:forNode', nodeId),
         matrix: () => ipcRenderer.invoke('annotations:matrix'),
-        delete: (id: string) => ipcRenderer.invoke('annotations:delete', id)
+        delete: (id: string) => ipcRenderer.invoke('annotations:delete', id),
+        updateTag: (annotationId: string, tagId: string | null) =>
+            ipcRenderer.invoke('annotations:updateTag', annotationId, tagId),
+        updateContent: (annotationId: string, content: string, rectsJson: string, pageNumber: number) =>
+            ipcRenderer.invoke('annotations:updateContent', annotationId, content, rectsJson, pageNumber)
+    },
+
+    // ── Tags ───────────────────────────────────────────────────────────────
+    tags: {
+        forNode: (nodeId: string) => ipcRenderer.invoke('tags:forNode', nodeId),
+        findOrCreate: (nodeId: string, name: string) =>
+            ipcRenderer.invoke('tags:findOrCreate', nodeId, name),
+        rename: (id: string, newName: string) =>
+            ipcRenderer.invoke('tags:rename', id, newName),
+        delete: (id: string) => ipcRenderer.invoke('tags:delete', id)
     },
 
     // ── System ─────────────────────────────────────────────────────────────
     system: {
         getDbPath: () => ipcRenderer.invoke('system:dbPath'),
         getPdfDir: () => ipcRenderer.invoke('system:pdfDir'),
-        checkFts5: () => ipcRenderer.invoke('system:checkFts5')
+        checkFts5: () => ipcRenderer.invoke('system:checkFts5'),
+        getFilePath: (file: File) => webUtils.getPathForFile(file),
+        showOpenDialog: (options: any) => ipcRenderer.invoke('system:showOpenDialog', options)
     },
 
     // ── Find ───────────────────────────────────────────────────────────────
@@ -80,7 +99,11 @@ const api = {
         start: (text: string, options?: { forward?: boolean; findNext?: boolean }) =>
             ipcRenderer.invoke('find:start', text, options),
         stop: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection') =>
-            ipcRenderer.invoke('find:stop', action)
+            ipcRenderer.invoke('find:stop', action),
+        onResult: (callback: (result: { activeMatchOrdinal: number; matches: number }) => void) => {
+            ipcRenderer.on('find:result', (_event, result) => callback(result))
+        },
+        offResult: () => ipcRenderer.removeAllListeners('find:result')
     },
 
     // ── Zotero ─────────────────────────────────────────────────────────────

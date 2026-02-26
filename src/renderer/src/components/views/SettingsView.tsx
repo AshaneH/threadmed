@@ -68,7 +68,7 @@ export function SettingsView() {
     async function loadDbPath() {
         try {
             if (!window.api) return
-            const path = await window.api.system.dbPath()
+            const path = await window.api.system.getDbPath()
             setDbPath(path)
         } catch (err) {
             console.error('[Settings] Failed to load db path:', err)

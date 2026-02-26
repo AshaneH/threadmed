@@ -2,33 +2,7 @@
 // ThreadMed — Shared TypeScript Types
 // ============================================================================
 
-/** A paper with its authors */
-export interface Paper {
-    id: string
-    zotero_key: string | null
-    title: string
-    year: number | null
-    doi: string | null
-    journal: string | null
-    abstract: string | null
-    pdf_filename: string | null
-    full_text: string | null
-    date_added: string
-    date_modified: string
-    zotero_version: number
-    authors: string[]
-}
-
-/** A thematic code node (e.g., Population, Intervention) */
-export interface Node {
-    id: string
-    name: string
-    color: string
-    is_default: number
-    sort_order: number
-}
-
-/** A text highlight annotation linked to a paper and node */
+/** A paper record */
 export interface Paper {
     id: string
     zotero_key: string | null
@@ -59,12 +33,34 @@ export interface CreatePaperInput {
     authors?: string[]
 }
 
+/** A thematic code node (e.g., Population, Intervention) */
 export interface Node {
     id: string
     name: string
     color: string
     is_default: number
     sort_order: number
+}
+
+/** A tag (subtype/code within a node, e.g., Population → "cirrhotics") */
+export interface Tag {
+    id: string
+    node_id: string
+    name: string
+}
+
+/** A text highlight annotation linked to a paper, node, and optional tag */
+export interface Annotation {
+    id: string
+    paper_id: string
+    node_id: string
+    tag_id: string | null
+    content: string
+    page_number: number
+    rects_json: string | null
+    color: string | null
+    created_at: string
+    tag_name?: string  // joined from tags table for display
 }
 
 export interface CreateAnnotationInput {
@@ -74,17 +70,14 @@ export interface CreateAnnotationInput {
     page_number: number
     rects_json?: string | null
     color?: string | null
+    tag_id?: string | null
 }
 
-export interface Annotation {
-    id: string
-    paper_id: string
-    node_id: string
-    content: string
-    page_number: number
-    rects_json: string | null
-    color: string | null
-    created_at: string
+/** Annotation with paper and node context */
+export interface AnnotationWithContext extends Annotation {
+    paper_title: string
+    node_name: string
+    node_color: string
 }
 
 /** Folder / Collection */
@@ -97,13 +90,6 @@ export interface Folder {
 }
 
 // ── Application State ────────────────────────────────────────────────────────
-
-/** Annotation with paper and node context */
-export interface AnnotationWithContext extends Annotation {
-    paper_title: string
-    node_name: string
-    node_color: string
-}
 
 /** A single cell in the synthesis matrix */
 export interface MatrixCell {
@@ -160,4 +146,3 @@ export interface SyncResult {
     errors: string[]
     libraryVersion: number
 }
-

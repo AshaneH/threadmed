@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useState, useEffect, Fragment } from 'react'
-import { BookOpen, ExternalLink, Plus, FileText, Trash2, Folder as FolderIcon, Edit2, ChevronRight } from 'lucide-react'
+import { BookOpen, ExternalLink, Plus, FileText, Trash2, Folder as FolderIcon, Edit2, ChevronRight, FileUp, FileMinus } from 'lucide-react'
 import { PaperDialog } from './PaperDialog'
 import { triggerDataRefresh, useDataRefresh } from '@/lib/events'
 import { isDescendant, getPathDepth, getTreeDepth } from '@/lib/dnd'
@@ -18,7 +18,7 @@ interface LibraryViewProps {
 }
 
 export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, onNavigate }: LibraryViewProps) {
-    const [papers, setPapers] = useState<Paper[]>([])
+    const [papers, setPapers] = useState<PaperWithAuthors[]>([])
     const [currentFolder, setCurrentFolder] = useState<Folder | null>(null)
     const [loading, setLoading] = useState(true)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -26,6 +26,7 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, o
     const [folders, setFolders] = useState<Folder[]>([])
     const [paperFoldersMap, setPaperFoldersMap] = useState<Record<string, string[]>>({})
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+    const [dragOverPaperId, setDragOverPaperId] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
@@ -86,16 +87,25 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, o
         }
     }
 
-    async function handleSavePaper(data: CreatePaperInput) {
+    async function handleSavePaper(data: CreatePaperInput & { pdfPath?: string }) {
+        const { pdfPath, ...paperData } = data
+        let paperId = editingPaper?.id
+
         if (editingPaper) {
-            await window.api.papers.update(editingPaper.id, data)
+            await window.api.papers.update(editingPaper.id, paperData)
         } else {
-            const newPaper = await window.api.papers.create(data)
+            const newPaper = await window.api.papers.create(paperData)
+            paperId = newPaper.id
             if (selectedFolderId) {
                 // Auto-add to the current folder
                 await window.api.folders.addPaper(newPaper.id, selectedFolderId)
             }
         }
+
+        if (paperId && pdfPath) {
+            await window.api.papers.addPdf(paperId, pdfPath)
+        }
+
         await loadData()
         triggerDataRefresh()
     }
@@ -390,12 +400,68 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, o
                             e.dataTransfer.setData('application/threadmed-source-folder', currentFolder.id)
                         }
                     }}
-                    className="w-full text-left p-5 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-hover)] transition-all group hover:-translate-y-0.5 active:translate-y-0 relative cursor-pointer"
+                    className={cn(
+                        "w-full text-left p-5 rounded-xl border transition-all group relative cursor-pointer",
+                        dragOverPaperId === paper.id
+                            ? "border-[var(--color-accent)] bg-[var(--color-accent-subtle)] ring-2 ring-[var(--color-accent)]/20 shadow-lg -translate-y-0.5"
+                            : "border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-hover)] hover:-translate-y-0.5 active:translate-y-0"
+                    )}
                     onClick={() => onPaperSelect(paper.id)}
+                    onDragOver={(e) => {
+                        if (e.dataTransfer.types.includes('Files')) {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'copy'
+                            setDragOverPaperId(paper.id)
+                        }
+                    }}
+                    onDragLeave={(e) => {
+                        const target = e.currentTarget as HTMLElement
+                        const related = e.relatedTarget as HTMLElement
+                        if (!related || !target.contains(related)) {
+                            setDragOverPaperId(null)
+                        }
+                    }}
+                    onDrop={async (e) => {
+                        if (dragOverPaperId === paper.id) {
+                            setDragOverPaperId(null)
+                            const files = Array.from(e.dataTransfer.files)
+                            const pdfFile = files.find(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+                            if (pdfFile) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                try {
+                                    const filePath = window.api.system.getFilePath(pdfFile)
+                                    if (!filePath) {
+                                        alert("Could not retrieve the file path for the dragged file. Please use the Upload button instead.")
+                                        return
+                                    }
+                                    await window.api.papers.addPdf(paper.id, filePath)
+                                    await loadData()
+                                    triggerDataRefresh()
+                                } catch (err) {
+                                    console.error('Failed to attach dropped PDF:', err)
+                                    alert('Failed to attach PDF.')
+                                }
+                            }
+                        }
+                    }}
                 >
                     <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-[var(--color-bg-active)] flex items-center justify-center shrink-0 group-hover:bg-[var(--color-accent-subtle)] transition-colors">
-                            <FileText size={18} className="text-[var(--color-text-tertiary)] group-hover:text-[var(--color-accent)] transition-colors" />
+                        <div
+                            className={cn(
+                                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                                paper.pdf_filename
+                                    ? "bg-[var(--color-accent-subtle)] group-hover:bg-[var(--color-accent)]/20"
+                                    : "bg-[var(--color-bg-active)] group-hover:bg-[var(--color-bg-hover)]"
+                            )}
+                            title={paper.pdf_filename ? 'PDF attached' : 'No PDF'}
+                        >
+                            <FileText size={18} className={cn(
+                                "transition-colors",
+                                paper.pdf_filename
+                                    ? "text-[var(--color-accent)]"
+                                    : "text-[var(--color-text-tertiary)] opacity-40"
+                            )} />
                         </div>
                         <div className="min-w-0 flex-1 space-y-1.5">
                             <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)] leading-snug group-hover:text-[var(--color-accent)] transition-colors pr-12 line-clamp-2">
@@ -422,7 +488,50 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, o
                                 </div>
                             )}
                         </div>
-                        <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-[var(--color-bg-elevated)]/80 backdrop-blur-sm px-1 py-1 rounded-lg">
+                            {/* Upload PDF */}
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation()
+                                    try {
+                                        const filePaths = await window.api.system.showOpenDialog({
+                                            properties: ['openFile'],
+                                            filters: [{ name: 'PDF Documents', extensions: ['pdf'] }]
+                                        })
+                                        if (filePaths && filePaths.length > 0) {
+                                            await window.api.papers.addPdf(paper.id, filePaths[0])
+                                            await loadData()
+                                            triggerDataRefresh()
+                                        }
+                                    } catch (err) {
+                                        console.error('Failed to attach PDF:', err)
+                                    }
+                                }}
+                                className="w-9 h-9 flex items-center justify-center rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent-subtle)] transition-colors"
+                                title={paper.pdf_filename ? "Replace PDF" : "Upload PDF"}
+                            >
+                                <FileUp size={16} />
+                            </button>
+
+                            {/* Remove PDF */}
+                            {paper.pdf_filename && (
+                                <button
+                                    onClick={async (e) => {
+                                        e.stopPropagation()
+                                        if (confirm('Are you sure you want to remove the PDF attachment?')) {
+                                            await window.api.papers.removePdf(paper.id)
+                                            await loadData()
+                                            triggerDataRefresh()
+                                        }
+                                    }}
+                                    className="w-9 h-9 flex items-center justify-center rounded-lg text-[var(--color-text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                    title="Remove PDF"
+                                >
+                                    <FileMinus size={16} />
+                                </button>
+                            )}
+
+                            {/* Edit */}
                             <button
                                 onClick={async (e) => {
                                     e.stopPropagation()
@@ -436,6 +545,8 @@ export function LibraryView({ selectedFolderId, onPaperSelect, onFolderSelect, o
                             >
                                 <Edit2 size={16} />
                             </button>
+
+                            {/* Delete */}
                             <button
                                 onClick={(e) => handleDelete(e, paper.id)}
                                 className="w-9 h-9 flex items-center justify-center rounded-lg text-[var(--color-text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"

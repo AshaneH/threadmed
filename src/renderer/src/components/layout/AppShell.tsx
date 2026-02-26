@@ -4,7 +4,10 @@
 // Three-panel resizable layout with generous spacing and refined aesthetics.
 // ============================================================================
 
+import { useState, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import type { ImperativePanelHandle } from 'react-resizable-panels'
+import { PanelLeft } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import type { ViewId } from '@/types'
@@ -29,6 +32,18 @@ export function AppShell({
     children
 }: AppShellProps) {
 
+    const sidebarRef = useRef<ImperativePanelHandle>(null)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+    const toggleSidebar = () => {
+        if (!sidebarRef.current) return
+        if (sidebarCollapsed) {
+            sidebarRef.current.expand()
+        } else {
+            sidebarRef.current.collapse()
+        }
+    }
+
     const viewTitles: Record<ViewId, string> = {
         library: 'Library',
         matrix: 'Synthesis Matrix',
@@ -45,9 +60,14 @@ export function AppShell({
                 <PanelGroup direction="horizontal" autoSaveId="threadmed-layout">
                     {/* ── Left: Sidebar ──────────────────────────────────────────── */}
                     <Panel
+                        ref={sidebarRef}
                         defaultSize={18}
                         minSize={14}
                         maxSize={30}
+                        collapsible={true}
+                        collapsedSize={0}
+                        onCollapse={() => setSidebarCollapsed(true)}
+                        onExpand={() => setSidebarCollapsed(false)}
                         id="sidebar"
                         order={1}
                     >
@@ -72,7 +92,14 @@ export function AppShell({
                     >
                         <div className="h-full flex flex-col bg-[var(--color-bg-base)]">
                             {/* Header with comfortable height */}
-                            <div className="drag-region h-[52px] border-b border-[var(--color-border-subtle)] flex items-center px-6 shrink-0">
+                            <div className="drag-region h-[52px] border-b border-[var(--color-border-subtle)] flex items-center px-6 shrink-0 gap-3">
+                                <button
+                                    onClick={toggleSidebar}
+                                    className="no-drag w-7 h-7 flex items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+                                    title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+                                >
+                                    <PanelLeft size={16} />
+                                </button>
                                 <h2 className="text-[14px] font-semibold text-[var(--color-text-secondary)] no-drag tracking-tight">
                                     {viewTitles[activeView]}
                                 </h2>

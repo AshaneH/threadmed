@@ -40,6 +40,11 @@ function createWindow(): void {
         return { action: 'deny' }
     })
 
+    // Listen for find-in-page results and send to renderer
+    mainWindow.webContents.on('found-in-page', (_event, result) => {
+        mainWindow?.webContents.send('find:result', result)
+    })
+
     // In dev, load from the Vite dev server; in production, load the built HTML
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
         mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])

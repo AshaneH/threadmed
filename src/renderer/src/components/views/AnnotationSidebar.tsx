@@ -2,9 +2,10 @@
 // ThreadMed — Annotation Sidebar
 // ============================================================================
 // Right panel showing paper metadata and annotations grouped by PICO node.
+// Supports click-to-scroll, flash highlight, and annotation re-select editing.
 // ============================================================================
 
-import { Trash2, FileText, ChevronLeft } from 'lucide-react'
+import { Trash2, FileText, ChevronLeft, Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Annotation, Node, PaperWithAuthors } from '@/types'
 
@@ -12,8 +13,11 @@ interface AnnotationSidebarProps {
     paper: PaperWithAuthors | null
     annotations: Annotation[]
     nodes: Node[]
+    editingAnnotationId: string | null
     onDeleteAnnotation: (id: string) => void
-    onScrollToPage: (page: number) => void
+    onScrollToAnnotation: (ann: Annotation) => void
+    onEditAnnotation: (ann: Annotation) => void
+    onCancelEdit: () => void
     onBack: () => void
 }
 
@@ -21,8 +25,11 @@ export function AnnotationSidebar({
     paper,
     annotations,
     nodes,
+    editingAnnotationId,
     onDeleteAnnotation,
-    onScrollToPage,
+    onScrollToAnnotation,
+    onEditAnnotation,
+    onCancelEdit,
     onBack
 }: AnnotationSidebarProps) {
     // Group annotations by node ID
@@ -58,6 +65,23 @@ export function AnnotationSidebar({
                 )}
             </div>
 
+            {/* Edit mode banner */}
+            {editingAnnotationId && (
+                <div className="px-4 py-2.5 bg-[var(--color-accent)]/10 border-b border-[var(--color-accent)]/20 flex items-center gap-2">
+                    <Pencil size={13} className="text-[var(--color-accent)] shrink-0" />
+                    <span className="text-[12px] font-medium text-[var(--color-accent)] flex-1">
+                        Select new text on the PDF to update this annotation
+                    </span>
+                    <button
+                        onClick={onCancelEdit}
+                        className="p-1 rounded hover:bg-[var(--color-accent)]/20 text-[var(--color-accent)] transition-colors"
+                        title="Cancel editing"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+
             {/* Annotation List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
                 {annotations.length === 0 ? (
@@ -90,37 +114,68 @@ export function AnnotationSidebar({
                                     </div>
 
                                     {/* Annotation Cards */}
-                                    {nodeAnnotations.map(ann => (
-                                        <div
-                                            key={ann.id}
-                                            className={cn(
-                                                "group relative p-3 rounded-lg border border-[var(--color-border-subtle)]",
-                                                "bg-[var(--color-bg-elevated)] hover:border-[var(--color-border)]",
-                                                "transition-colors cursor-pointer"
-                                            )}
-                                            style={{ borderLeftColor: node.color, borderLeftWidth: 3 }}
-                                            onClick={() => onScrollToPage(ann.page_number)}
-                                        >
-                                            <p className="text-[13px] text-[var(--color-text-primary)] leading-relaxed line-clamp-4">
-                                                "{ann.content}"
-                                            </p>
-                                            <p className="text-[11px] text-[var(--color-text-tertiary)] mt-1.5">
-                                                Page {ann.page_number}
-                                            </p>
-
-                                            {/* Delete */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    onDeleteAnnotation(ann.id)
-                                                }}
-                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 w-7 h-7 flex items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-all"
-                                                title="Delete annotation"
+                                    {nodeAnnotations.map(ann => {
+                                        const isEditing = editingAnnotationId === ann.id
+                                        return (
+                                            <div
+                                                key={ann.id}
+                                                className={cn(
+                                                    "group relative p-3 rounded-lg border",
+                                                    "bg-[var(--color-bg-elevated)] transition-all cursor-pointer",
+                                                    isEditing
+                                                        ? "border-[var(--color-accent)] ring-1 ring-[var(--color-accent)]/30 shadow-md"
+                                                        : "border-[var(--color-border-subtle)] hover:border-[var(--color-border)]"
+                                                )}
+                                                style={{ borderLeftColor: node.color, borderLeftWidth: 3 }}
+                                                onClick={() => onScrollToAnnotation(ann)}
                                             >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        </div>
-                                    ))}
+                                                <p className="text-[13px] text-[var(--color-text-primary)] leading-relaxed line-clamp-4">
+                                                    "{ann.content}"
+                                                </p>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <span className="text-[11px] text-[var(--color-text-tertiary)]">
+                                                        Page {ann.page_number}
+                                                    </span>
+                                                    {ann.tag_name && (
+                                                        <span
+                                                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                                            style={{
+                                                                backgroundColor: `${node.color}18`,
+                                                                color: node.color,
+                                                                border: `1px solid ${node.color}30`
+                                                            }}
+                                                        >
+                                                            {ann.tag_name}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Action buttons */}
+                                                <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onEditAnnotation(ann)
+                                                        }}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
+                                                        title="Re-select text for this annotation"
+                                                    >
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onDeleteAnnotation(ann.id)
+                                                        }}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--color-text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                        title="Delete annotation"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             )
                         })

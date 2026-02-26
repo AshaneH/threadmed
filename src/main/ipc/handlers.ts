@@ -5,16 +5,17 @@
 // repository layer and returns typed results to the renderer process.
 // ============================================================================
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, dialog } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import { listPapers, getPaper, createPaper, getPaperCount, searchPapers, updatePaperFullText } from '../database/repositories/papers'
 import { listNodes, createNode, updateNode, deleteNode } from '../database/repositories/nodes'
-import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation } from '../database/repositories/annotations'
-import { getDbPath, getPdfDir } from '../database/connection'
+import { createAnnotation, getAnnotationsForPaper, getAnnotationsForNode, getMatrixData, deleteAnnotation, updateAnnotationTag, updateAnnotationContent } from '../database/repositories/annotations'
+import { listTagsForNode, findOrCreateTag, renameTag, deleteTag } from '../database/repositories/tags'
+import { getDb, getDbPath, getPdfDir } from '../database/connection'
 import { connectZotero, disconnectZotero, getZoteroStatus, syncLibrary } from '../services/sync-engine'
 import { listFolders, createFolder, updateFolder, deleteFolder, addPaperToFolder, removePaperFromFolder, getPapersInFolder, getPaperMappings } from '../database/repositories/folders'
-import { deletePaper, updatePaper } from '../database/repositories/papers'
+import { deletePaper, updatePaper, addPdfToPaper, removePdfFromPaper } from '../database/repositories/papers'
 import type { CreatePaperInput } from '../database/repositories/papers'
 import type { CreateAnnotationInput } from '../database/repositories/annotations'
 
@@ -50,6 +51,14 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('papers:update', (_event, id: string, updates: Partial<CreatePaperInput>) => {
         return updatePaper(id, updates)
+    })
+
+    ipcMain.handle('papers:addPdf', (_event, id: string, sourcePath: string) => {
+        return addPdfToPaper(id, sourcePath)
+    })
+
+    ipcMain.handle('papers:removePdf', (_event, id: string) => {
+        return removePdfFromPaper(id)
     })
 
     // ── Folder Handlers ──────────────────────────────────────────────────────
@@ -123,6 +132,31 @@ export function registerIpcHandlers(): void {
         return deleteAnnotation(id)
     })
 
+    ipcMain.handle('annotations:updateTag', (_event, annotationId: string, tagId: string | null) => {
+        return updateAnnotationTag(annotationId, tagId)
+    })
+
+    ipcMain.handle('annotations:updateContent', (_event, annotationId: string, content: string, rectsJson: string, pageNumber: number) => {
+        return updateAnnotationContent(annotationId, content, rectsJson, pageNumber)
+    })
+
+    // ── Tag Handlers ─────────────────────────────────────────────────────────
+    ipcMain.handle('tags:forNode', (_event, nodeId: string) => {
+        return listTagsForNode(nodeId)
+    })
+
+    ipcMain.handle('tags:findOrCreate', (_event, nodeId: string, name: string) => {
+        return findOrCreateTag(nodeId, name)
+    })
+
+    ipcMain.handle('tags:rename', (_event, id: string, newName: string) => {
+        return renameTag(id, newName)
+    })
+
+    ipcMain.handle('tags:delete', (_event, id: string) => {
+        return deleteTag(id)
+    })
+
     // ── System Handlers ──────────────────────────────────────────────────────
     ipcMain.handle('system:dbPath', () => {
         return getDbPath()
@@ -132,11 +166,32 @@ export function registerIpcHandlers(): void {
         return getPdfDir()
     })
 
+    ipcMain.handle('system:checkFts5', () => {
+        const db = getDb()
+        try {
+            const row = db.prepare("SELECT sqlite_compileoption_used('ENABLE_FTS5') as enabled").get() as any
+            return row.enabled === 1
+        } catch (e) {
+            return false
+        }
+    })
+
+    ipcMain.handle('system:showOpenDialog', async (event, options) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        if (!window) return undefined
+        const { canceled, filePaths } = await dialog.showOpenDialog(window, options)
+        if (canceled) return undefined
+        return filePaths
+    })
+
     // ── Find-in-Page Handlers ───────────────────────────────────────────────
-    ipcMain.handle('find:start', (_event, text: string, options?: { forward?: boolean; findNext?: boolean }) => {
-        const win = BrowserWindow.getFocusedWindow()
+    ipcMain.handle('find:start', (event, text: string, options?: { forward?: boolean; findNext?: boolean }) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
         if (!win || !text) return null
-        return win.webContents.findInPage(text, options)
+
+        // Listen for results once if not already listening (or just rely on the event)
+        // Note: multiple calls to findInPage fire multiple events.
+        return event.sender.findInPage(text, options)
     })
 
     ipcMain.handle('find:stop', (_event, action?: 'clearSelection' | 'keepSelection' | 'activateSelection') => {

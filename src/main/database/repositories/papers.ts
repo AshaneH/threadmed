@@ -3,8 +3,8 @@
 // ============================================================================
 
 import { v4 as uuidv4 } from 'uuid'
-import { join, basename } from 'path'
-import { unlinkSync, existsSync } from 'fs'
+import { join, basename, extname } from 'path'
+import { unlinkSync, existsSync, copyFileSync } from 'fs'
 import { getDb, getPdfDir } from '../connection'
 
 export interface Paper {
@@ -226,29 +226,64 @@ export function deletePaper(id: string): void {
 /** 
  * Manually update a paper's metadata. 
  */
-export function updatePaper(id: string, updates: Partial<CreatePaperInput>): void {
+export function updatePaper(id: string, updates: Partial<CreatePaperInput>): void { }
+
+/**
+ * Manually attach a PDF to a paper, copying it from a source path to the app's data directory.
+ * @returns The generated filename in the app data dir.
+ */
+export function addPdfToPaper(paperId: string, sourcePdfPath: string): string {
     const db = getDb()
+    const paper = db.prepare('SELECT title, pdf_filename FROM papers WHERE id = ?').get(paperId) as { title: string, pdf_filename: string | null } | undefined
+    if (!paper) throw new Error(`Paper with id ${paperId} not found`)
 
-    const setClauses: string[] = []
-    const values: (string | number | null)[] = []
-
-    if (updates.title !== undefined) { setClauses.push('title = ?'); values.push(updates.title) }
-    if (updates.year !== undefined) { setClauses.push('year = ?'); values.push(updates.year) }
-    if (updates.doi !== undefined) { setClauses.push('doi = ?'); values.push(updates.doi) }
-    if (updates.journal !== undefined) { setClauses.push('journal = ?'); values.push(updates.journal) }
-    if (updates.abstract !== undefined) { setClauses.push('abstract = ?'); values.push(updates.abstract) }
-
-    if (setClauses.length > 0) {
-        setClauses.push("date_modified = datetime('now')")
-        const stmt = `UPDATE papers SET ${setClauses.join(', ')} WHERE id = ?`
-        db.prepare(stmt).run(...values, id)
+    // Delete existing PDF if any to avoid orphans
+    if (paper.pdf_filename) {
+        const safeOldFilename = basename(paper.pdf_filename)
+        const oldPdfPath = join(getPdfDir(), safeOldFilename)
+        if (existsSync(oldPdfPath)) {
+            try { unlinkSync(oldPdfPath) } catch (e) { /* ignore */ }
+        }
     }
 
-    if (updates.authors) {
-        db.prepare('DELETE FROM paper_authors WHERE paper_id = ?').run(id)
-        insertAuthorsForPaper(db, id, updates.authors)
+    const safeTitle = paper.title.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 50) || paperId.substring(0, 8)
+    const ext = extname(sourcePdfPath) || '.pdf'
+    const newFilename = `${safeTitle}_${Date.now()}${ext}`
+    const destPath = join(getPdfDir(), newFilename)
+
+    copyFileSync(sourcePdfPath, destPath)
+
+    db.prepare(`
+        UPDATE papers 
+        SET pdf_filename = ?, full_text = NULL, date_modified = datetime('now') 
+        WHERE id = ?
+    `).run(newFilename, paperId)
+
+    return newFilename
+}
+
+/**
+ * Manually remove a PDF attachment from a paper and delete the file from disk.
+ */
+export function removePdfFromPaper(paperId: string): void {
+    const db = getDb()
+    const paper = db.prepare('SELECT pdf_filename FROM papers WHERE id = ?').get(paperId) as { pdf_filename: string | null } | undefined
+
+    if (paper?.pdf_filename) {
+        const safeFilename = basename(paper.pdf_filename)
+        const pdfPath = join(getPdfDir(), safeFilename)
+        if (existsSync(pdfPath)) {
+            try { unlinkSync(pdfPath) } catch (e) { console.error(`Failed to delete PDF: ${e}`) }
+        }
+        db.prepare(`
+            UPDATE papers 
+            SET pdf_filename = NULL, full_text = NULL, date_modified = datetime('now') 
+            WHERE id = ?
+        `).run(paperId)
     }
 }
+
+
 
 /** Helper: insert authors for a paper */
 function insertAuthorsForPaper(db: ReturnType<typeof getDb>, paperId: string, authors: string[]): void {

@@ -289,7 +289,7 @@ function FolderNode({
                                     style={{ paddingLeft: `${Math.max(12, (level + 1) * 16 + 22)}px`, paddingRight: '12px' }}
                                     title={paper.title}
                                 >
-                                    <FileText size={11} className="shrink-0 opacity-40 relative z-10" />
+                                    <FileText size={11} className={cn("shrink-0 relative z-10", paper.pdf_filename ? 'text-[var(--color-accent)] opacity-70' : 'opacity-25')} />
                                     <span className="truncate flex-1 relative z-10">{paper.title}</span>
                                 </button>
                             ))}
@@ -585,7 +585,7 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                                                 )}
                                                 title={paper.title}
                                             >
-                                                <FileText size={12} className="shrink-0 opacity-40 ml-1" />
+                                                <FileText size={12} className={cn("shrink-0 ml-1", paper.pdf_filename ? 'text-[var(--color-accent)] opacity-70' : 'opacity-25')} />
                                                 <span className="truncate flex-1">{paper.title}</span>
                                             </button>
                                         ))}
@@ -596,21 +596,22 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                     )}
                 </div>
 
-                {/* ── Nodes (Codes) ───────────────────────────────────────────── */}
+                {/* ── Nodes ─────────────────────────────────────────────────── */}
                 <div>
                     <button
                         onClick={() => setNodesExpanded(!nodesExpanded)}
                         className="flex items-center gap-2 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors w-full no-drag"
                     >
                         {nodesExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                        Nodes (Codes)
+                        Nodes
                     </button>
                     {nodesExpanded && (
                         <div className="mt-2 space-y-1">
                             {nodes.map((node) => (
-                                <div
+                                <button
                                     key={node.id}
-                                    className="flex items-center gap-3 px-4 py-2 text-[12px] text-[var(--color-text-secondary)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors cursor-default"
+                                    onClick={() => onViewChange('matrix')}
+                                    className="flex items-center gap-3 px-4 py-2 text-[12px] text-[var(--color-text-secondary)] rounded-lg hover:bg-[var(--color-bg-hover)] transition-colors cursor-pointer w-full text-left no-drag"
                                 >
                                     <span
                                         className="w-3 h-3 rounded-full shrink-0 shadow-sm"
@@ -620,7 +621,7 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                                     {node.is_default === 1 && (
                                         <Tags size={10} className="opacity-25 shrink-0" />
                                     )}
-                                </div>
+                                </button>
                             ))}
                             <button
                                 className="flex items-center gap-3 px-4 py-2.5 text-[12px] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] rounded-lg hover:bg-[var(--color-accent-subtle)] transition-all w-full no-drag mt-1"

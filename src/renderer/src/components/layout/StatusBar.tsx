@@ -21,7 +21,7 @@ export function StatusBar() {
             if (!window.api) return
             const [count, path] = await Promise.all([
                 window.api.papers.count(),
-                window.api.system.dbPath()
+                window.api.system.getDbPath()
             ])
             setPaperCount(count)
             setDbPath(path)

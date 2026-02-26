@@ -61,11 +61,20 @@ export function runSchema(db: Database.Database): void {
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
+    -- ─── Tags (subtypes within a node) ───────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS tags (
+      id      TEXT PRIMARY KEY,
+      node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      name    TEXT NOT NULL,
+      UNIQUE(node_id, name)
+    );
+
     -- ─── Annotations (Highlights) ────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS annotations (
       id          TEXT PRIMARY KEY,
       paper_id    TEXT NOT NULL REFERENCES papers(id) ON DELETE CASCADE,
       node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      tag_id      TEXT REFERENCES tags(id) ON DELETE SET NULL,
       content     TEXT NOT NULL,
       page_number INTEGER NOT NULL,
       rects_json  TEXT,
@@ -95,6 +104,7 @@ export function runSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_papers_year ON papers(year);
     CREATE INDEX IF NOT EXISTS idx_paper_authors_paper ON paper_authors(paper_id);
     CREATE INDEX IF NOT EXISTS idx_paper_authors_author ON paper_authors(author_id);
+    CREATE INDEX IF NOT EXISTS idx_tags_node ON tags(node_id);
     CREATE INDEX IF NOT EXISTS idx_annotations_paper ON annotations(paper_id);
     CREATE INDEX IF NOT EXISTS idx_annotations_node ON annotations(node_id);
     CREATE INDEX IF NOT EXISTS idx_memo_references_memo ON memo_references(memo_id);
@@ -109,6 +119,17 @@ export function runSchema(db: Database.Database): void {
       value TEXT NOT NULL
     );
   `)
+
+  // Migration: add tag_id to annotations if it doesn't exist (safe for existing DBs)
+  try {
+    db.exec(`ALTER TABLE annotations ADD COLUMN tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL`)
+    console.log('[ThreadMed DB] Migrated: added tag_id to annotations')
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Create tag_id index after migration guarantees the column exists
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_annotations_tag ON annotations(tag_id)`)
 
   // Seed default EBM nodes (only if nodes table is empty)
   seedDefaultNodes(db)
