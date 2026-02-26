@@ -6,9 +6,10 @@ import { app, shell, BrowserWindow, protocol, net } from 'electron'
 import { join } from 'path'
 import * as fs from 'fs'
 import { is } from '@electron-toolkit/utils'
-import { initDatabase, closeDatabase, getDbPath, getPdfDir } from './database/connection'
+import { closeDatabase, getPdfDir } from './database/connection'
 import { registerIpcHandlers } from './ipc/handlers'
 import { getPaper } from './database/repositories/papers'
+import { migrateIfNeeded, listRecentProjects, openProject } from './services/project-manager'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -56,35 +57,50 @@ function createWindow(): void {
 // ── Application Lifecycle ────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
-    // Initialize database (synchronous with better-sqlite3)
-    try {
-        const dbPath = getDbPath()
-        console.log(`[ThreadMed] Database path: ${dbPath}`)
-        initDatabase()
-        console.log('[ThreadMed] Database initialized successfully')
-    } catch (err) {
-        console.error('[ThreadMed] FATAL: Database initialization failed:', err)
-        app.quit()
-        return
-    }
-
-    // Register IPC handlers
+    // Register IPC handlers (must happen before any renderer IPC calls)
     registerIpcHandlers()
     console.log('[ThreadMed] IPC handlers registered')
+
+    // Attempt to open a project:
+    // 1. Migrate legacy single-DB layout if needed
+    // 2. Otherwise, auto-open the most recent project
+    // 3. If neither exists, the renderer will show the ProjectPicker
+    try {
+        const migrated = migrateIfNeeded()
+        if (migrated) {
+            console.log(`[ThreadMed] Migrated legacy data into: ${migrated.path}`)
+        } else {
+            // Try to auto-open the most recent project
+            const recent = listRecentProjects()
+            if (recent.length > 0) {
+                openProject(recent[0].path)
+                console.log(`[ThreadMed] Auto-opened recent project: ${recent[0].name}`)
+            } else {
+                console.log('[ThreadMed] No projects found — renderer will show ProjectPicker')
+            }
+        }
+    } catch (err) {
+        console.error('[ThreadMed] Project initialization error:', err)
+        // Not fatal — the renderer will show the ProjectPicker
+    }
 
     // Register custom protocol for serving PDF files to the renderer
     protocol.handle('threadmed-pdf', (request) => {
         const url = new URL(request.url)
         const paperId = url.hostname || url.pathname.replace(/^\/+/, '')
-        const paper = getPaper(paperId)
-        if (!paper?.pdf_filename) {
-            return new Response('PDF not found', { status: 404 })
+        try {
+            const paper = getPaper(paperId)
+            if (!paper?.pdf_filename) {
+                return new Response('PDF not found', { status: 404 })
+            }
+            const filePath = join(getPdfDir(), paper.pdf_filename)
+            if (!fs.existsSync(filePath)) {
+                return new Response('File not found on disk', { status: 404 })
+            }
+            return net.fetch(`file://${filePath}`)
+        } catch {
+            return new Response('No project open', { status: 503 })
         }
-        const filePath = join(getPdfDir(), paper.pdf_filename)
-        if (!fs.existsSync(filePath)) {
-            return new Response('File not found on disk', { status: 404 })
-        }
-        return net.fetch(`file://${filePath}`)
     })
     console.log('[ThreadMed] Custom PDF protocol registered')
 

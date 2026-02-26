@@ -9,6 +9,17 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 /** The API exposed to the renderer via window.api */
 const api = {
+    // ── Projects ───────────────────────────────────────────────────────────
+    projects: {
+        list: () => ipcRenderer.invoke('projects:list'),
+        active: () => ipcRenderer.invoke('projects:active'),
+        new: () => ipcRenderer.invoke('projects:new'),
+        open: () => ipcRenderer.invoke('projects:open'),
+        openRecent: (path: string) => ipcRenderer.invoke('projects:openRecent', path),
+        delete: (path: string) => ipcRenderer.invoke('projects:delete', path),
+        rename: (path: string, newName: string) => ipcRenderer.invoke('projects:rename', path, newName)
+    },
+
     // ── Papers ─────────────────────────────────────────────────────────────
     papers: {
         list: () => ipcRenderer.invoke('papers:list'),

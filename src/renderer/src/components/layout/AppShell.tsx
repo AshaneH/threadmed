@@ -19,6 +19,8 @@ interface AppShellProps {
     onPaperSelect: (paperId: string) => void
     selectedFolderId: string | null
     onFolderSelect: (folderId: string | null) => void
+    projectName?: string
+    onSwitchProject?: () => void
     children: React.ReactNode
 }
 
@@ -29,6 +31,8 @@ export function AppShell({
     onPaperSelect,
     selectedFolderId,
     onFolderSelect,
+    projectName,
+    onSwitchProject,
     children
 }: AppShellProps) {
 
@@ -78,6 +82,8 @@ export function AppShell({
                             selectedPaperId={selectedPaperId}
                             selectedFolderId={selectedFolderId}
                             onFolderSelect={onFolderSelect}
+                            projectName={projectName}
+                            onSwitchProject={onSwitchProject}
                         />
                     </Panel>
 

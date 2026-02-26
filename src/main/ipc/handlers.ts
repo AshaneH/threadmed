@@ -16,10 +16,42 @@ import { getDb, getDbPath, getPdfDir } from '../database/connection'
 import { connectZotero, disconnectZotero, getZoteroStatus, syncLibrary } from '../services/sync-engine'
 import { listFolders, createFolder, updateFolder, deleteFolder, addPaperToFolder, removePaperFromFolder, getPapersInFolder, getPaperMappings } from '../database/repositories/folders'
 import { deletePaper, updatePaper, addPdfToPaper, removePdfFromPaper } from '../database/repositories/papers'
+import { listRecentProjects, getActiveProject, openProject, deleteProject, renameProject, showNewProjectDialog, showOpenProjectDialog } from '../services/project-manager'
 import type { CreatePaperInput } from '../database/repositories/papers'
 import type { CreateAnnotationInput } from '../database/repositories/annotations'
 
 export function registerIpcHandlers(): void {
+    // ── Project Handlers ─────────────────────────────────────────────────────
+    ipcMain.handle('projects:list', () => {
+        return listRecentProjects()
+    })
+
+    ipcMain.handle('projects:active', () => {
+        return getActiveProject()
+    })
+
+    ipcMain.handle('projects:new', async (event) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        return showNewProjectDialog(window)
+    })
+
+    ipcMain.handle('projects:open', async (event) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        return showOpenProjectDialog(window)
+    })
+
+    ipcMain.handle('projects:openRecent', (_event, projectPath: string) => {
+        return openProject(projectPath)
+    })
+
+    ipcMain.handle('projects:delete', (_event, projectPath: string) => {
+        return deleteProject(projectPath)
+    })
+
+    ipcMain.handle('projects:rename', (_event, projectPath: string, newName: string) => {
+        return renameProject(projectPath, newName)
+    })
+
     // ── Paper Handlers ───────────────────────────────────────────────────────
     ipcMain.handle('papers:list', () => {
         return listPapers()

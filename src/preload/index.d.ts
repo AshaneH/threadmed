@@ -4,7 +4,22 @@ import type {
     AnnotationWithContext, MatrixCell, ZoteroStatus, SyncResult
 } from '../renderer/src/types'
 
+export interface Project {
+    name: string
+    path: string
+    lastOpenedAt: string
+}
+
 export interface ThreadMedAPI {
+    projects: {
+        list: () => Promise<Project[]>
+        active: () => Promise<Project | null>
+        new: () => Promise<Project | null>
+        open: () => Promise<Project | null>
+        openRecent: (path: string) => Promise<Project>
+        delete: (path: string) => Promise<void>
+        rename: (path: string, newName: string) => Promise<Project>
+    }
     papers: {
         list: () => Promise<PaperWithAuthors[]>
         get: (id: string) => Promise<PaperWithAuthors | null>

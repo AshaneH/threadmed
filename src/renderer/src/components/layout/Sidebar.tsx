@@ -33,6 +33,8 @@ interface SidebarProps {
     selectedPaperId: string | null
     selectedFolderId: string | null
     onFolderSelect: (folderId: string | null) => void
+    projectName?: string
+    onSwitchProject?: () => void
 }
 
 interface NavItemProps {
@@ -309,7 +311,7 @@ function FolderNode({
 
 
 
-export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaperId, selectedFolderId, onFolderSelect }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaperId, selectedFolderId, onFolderSelect, projectName, onSwitchProject }: SidebarProps) {
     const [papers, setPapers] = useState<Paper[]>([])
     const [nodes, setNodes] = useState<Node[]>([])
     const [folders, setFolders] = useState<Folder[]>([])
@@ -375,6 +377,23 @@ export function Sidebar({ activeView, onViewChange, onPaperSelect, selectedPaper
                     {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
                 </button>
             </div>
+
+            {/* ── Project Indicator ──────────────────────────────────────── */}
+            {projectName && (
+                <button
+                    onClick={onSwitchProject}
+                    className="no-drag flex items-center gap-2 mx-4 mt-3 px-3 py-2 rounded-lg bg-[var(--color-bg-active)] hover:bg-[var(--color-bg-hover)] transition-colors group border border-[var(--color-border-subtle)]"
+                    title="Switch project"
+                >
+                    <div className="w-5 h-5 rounded bg-[var(--color-accent)]/15 flex items-center justify-center shrink-0">
+                        <FileText size={11} className="text-[var(--color-accent)]" />
+                    </div>
+                    <span className="text-[12px] font-medium text-[var(--color-text-secondary)] truncate flex-1 text-left">
+                        {projectName}
+                    </span>
+                    <ChevronDown size={12} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                </button>
+            )}
 
             {/* ── Main Navigation ──────────────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto py-5 px-4">

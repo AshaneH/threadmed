@@ -2,11 +2,10 @@
 // ThreadMed — SQLite Database Connection (better-sqlite3)
 // ============================================================================
 // Uses better-sqlite3 for synchronous, high-performance SQLite access.
-// The database is stored in Electron's userData directory.
+// The database is stored inside the active .tdmd project directory.
 // FTS5 is natively supported via better-sqlite3.
 // ============================================================================
 
-import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 import Database from 'better-sqlite3'
@@ -14,32 +13,45 @@ import { runSchema } from './schema'
 import { setupFts } from './fts'
 
 let db: Database.Database | null = null
+let activeProjectDir: string | null = null
 
-/** Returns the path to the SQLite database file in Electron's userData dir */
+/** Returns the path to the SQLite database file in the active project */
 export function getDbPath(): string {
-    const userDataPath = app.getPath('userData')
-    const dataDir = join(userDataPath, 'data')
-    if (!existsSync(dataDir)) {
-        mkdirSync(dataDir, { recursive: true })
-    }
-    return join(dataDir, 'threadmed.db')
+    if (!activeProjectDir) throw new Error('No project is open.')
+    return join(activeProjectDir, 'threadmed.db')
 }
 
-/** Returns the directory where PDFs are stored */
+/** Returns the directory where PDFs are stored for the active project */
 export function getPdfDir(): string {
-    const userDataPath = app.getPath('userData')
-    const pdfDir = join(userDataPath, 'data', 'pdfs')
+    if (!activeProjectDir) throw new Error('No project is open.')
+    const pdfDir = join(activeProjectDir, 'pdfs')
     if (!existsSync(pdfDir)) {
         mkdirSync(pdfDir, { recursive: true })
     }
     return pdfDir
 }
 
-/** Initialize the database connection and run migrations */
-export function initDatabase(): void {
-    if (db) return
+/** Returns the active project directory path */
+export function getActiveProjectDir(): string | null {
+    return activeProjectDir
+}
 
-    const dbPath = getDbPath()
+/** Initialize the database connection for a given project directory and run migrations */
+export function initDatabase(projectDir: string): void {
+    // Close any previously open database
+    if (db) {
+        closeDatabase()
+    }
+
+    activeProjectDir = projectDir
+
+    const dbPath = join(projectDir, 'threadmed.db')
+
+    // Ensure pdfs directory exists
+    const pdfDir = join(projectDir, 'pdfs')
+    if (!existsSync(pdfDir)) {
+        mkdirSync(pdfDir, { recursive: true })
+    }
 
     db = new Database(dbPath)
 
@@ -70,6 +82,7 @@ export function closeDatabase(): void {
     if (db) {
         db.close()
         db = null
+        activeProjectDir = null
         console.log('[ThreadMed DB] Connection closed')
     }
 }
