@@ -1,12 +1,11 @@
 // ============================================================================
 // ThreadMed — Project Manager
 // ============================================================================
-// Manages .tdmd project bundles: create, open, list recent, delete.
-// Each project is a directory with the .tdmd extension containing its own
-// SQLite database and PDF files.
+// Manages project bundles: create, open, list recent, delete.
+// Each project is a directory containing its own SQLite database and PDF files.
 //
 // Directory structure:
-//   MyReview.tdmd/
+//   MyReview/
 //   ├── threadmed.db
 //   └── pdfs/
 //
@@ -78,12 +77,8 @@ export function removeFromRecent(projectPath: string): void {
     writeRegistry(projects)
 }
 
-/** Create a new .tdmd project at the given directory path */
+/** Create a new project at the given directory path */
 export function createProject(projectDir: string, name: string): Project {
-    // Ensure the directory has the .tdmd extension
-    if (!projectDir.toLowerCase().endsWith('.tdmd')) {
-        projectDir = projectDir + '.tdmd'
-    }
 
     if (existsSync(projectDir)) {
         throw new Error(`A project already exists at: ${projectDir}`)
@@ -110,37 +105,34 @@ export function createProject(projectDir: string, name: string): Project {
     return project
 }
 
-/** Open an existing .tdmd project */
-export function openProject(tdmdPath: string): Project {
-    if (!existsSync(tdmdPath)) {
-        throw new Error(`Project not found: ${tdmdPath}`)
+/** Open an existing project */
+export function openProject(projectPath: string): Project {
+    if (!existsSync(projectPath)) {
+        throw new Error(`Project not found: ${projectPath}`)
     }
 
-    const dbFile = join(tdmdPath, 'threadmed.db')
+    const dbFile = join(projectPath, 'threadmed.db')
 
     // Close any currently open project
     closeDatabase()
 
     // Initialize the database for this project
-    initDatabase(tdmdPath)
+    initDatabase(projectPath)
 
-    // Derive project name from directory basename (strip .tdmd extension)
-    const dirName = basename(tdmdPath)
-    const name = dirName.endsWith('.tdmd')
-        ? dirName.slice(0, -5)
-        : dirName
+    // Derive project name from directory basename
+    const name = basename(projectPath)
 
-    const project: Project = {
+    const project: Project {
         name,
-        path: tdmdPath,
+        path: projectPath,
         lastOpenedAt: new Date().toISOString()
-    }
+}
 
-    activeProject = project
-    addToRecent(project)
+activeProject = project
+addToRecent(project)
 
-    console.log(`[ProjectManager] Opened project: ${name}`)
-    return project
+console.log(`[ProjectManager] Opened project: ${name}`)
+return project
 }
 
 /** Get the currently active project */
@@ -192,10 +184,9 @@ export function deleteProject(projectPath: string): void {
 /** Show a Save dialog for creating a new project */
 export async function showNewProjectDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
     const result = await dialog.showSaveDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
-        title: 'Create New Project',
-        defaultPath: join(app.getPath('documents'), 'Untitled Review.tdmd'),
-        buttonLabel: 'Create Project',
-        filters: [{ name: 'ThreadMed Project', extensions: ['tdmd'] }],
+        title: 'Create New Project Folder',
+        defaultPath: join(app.getPath('documents'), 'Untitled Review'),
+        buttonLabel: 'Create Folder',
         properties: ['createDirectory', 'showOverwriteConfirmation'] as any
     })
 
@@ -203,38 +194,27 @@ export async function showNewProjectDialog(parentWindow: BrowserWindow | null): 
 
     // Extract name from the chosen path
     let filePath = result.filePath
-    if (!filePath.toLowerCase().endsWith('.tdmd')) filePath += '.tdmd'
-    const name = basename(filePath).replace(/\.tdmd$/i, '')
+    const name = basename(filePath)
 
     return createProject(filePath, name)
 }
 
 /** Show an Open dialog for selecting an existing .tdmd project */
 export async function showOpenProjectDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
-    // On macOS, you can select directories that look like files using filters
-    // On Windows/Linux, you still need to select a directory, but you can't filter by dir extension in the native dialog
-    const isMac = process.platform === 'darwin'
-
     const result = await dialog.showOpenDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
-        title: 'Open Project',
+        title: 'Open Project Folder',
         defaultPath: app.getPath('documents'),
-        buttonLabel: 'Open Project',
-        properties: isMac ? ['openDirectory', 'openFile'] : ['openDirectory'],
-        filters: isMac ? [{ name: 'ThreadMed Project', extensions: ['tdmd'] }] : []
+        buttonLabel: 'Open Folder',
+        properties: ['openDirectory']
     })
 
     if (result.canceled || result.filePaths.length === 0) return null
 
     const selectedPath = result.filePaths[0]
 
-    // Validate it's a .tdmd directory with a database inside
-    if (!selectedPath.toLowerCase().endsWith('.tdmd')) {
-        throw new Error('Please select a folder ending with .tdmd')
-    }
-
     const dbFile = join(selectedPath, 'threadmed.db')
     if (!existsSync(dbFile)) {
-        throw new Error('The selected folder is not a valid ThreadMed project (no threadmed.db found).')
+        throw new Error('The selected folder is not a valid ThreadMed project (no threadmed.db found inside).')
     }
 
     return openProject(selectedPath)
@@ -243,11 +223,11 @@ export async function showOpenProjectDialog(parentWindow: BrowserWindow | null):
 // ── Migration ────────────────────────────────────────────────────────────────
 
 /**
- * Migrate legacy single-database layout to the .tdmd project format.
+ * Migrate legacy single-database layout to the project format.
  * Called once on first launch after the update.
  *
  * Old layout: userData/data/threadmed.db + userData/data/pdfs/
- * New layout: userData/Migrated Project.tdmd/threadmed.db + pdfs/
+ * New layout: userData/Migrated Project/threadmed.db + pdfs/
  */
 export function migrateIfNeeded(): Project | null {
     const userDataPath = app.getPath('userData')
@@ -257,7 +237,7 @@ export function migrateIfNeeded(): Project | null {
 
     console.log('[ProjectManager] Legacy database detected — running migration...')
 
-    const migratedDir = join(userDataPath, 'Migrated Project.tdmd')
+    const migratedDir = join(userDataPath, 'Migrated Project')
 
     // Don't migrate twice
     if (existsSync(migratedDir)) {

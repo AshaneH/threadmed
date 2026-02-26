@@ -287,7 +287,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps) {
             {/* Empty State */}
             {!loading && recentProjects.length === 0 && (
                 <p className="text-[13px] text-[var(--color-text-tertiary)] text-center max-w-sm">
-                    Create a new project to get started, or open an existing <code className="px-1 py-0.5 rounded bg-[var(--color-bg-active)] text-[12px]">.tdmd</code> project file.
+                    Create a new project folder to get started, or open an existing project directory.
                 </p>
             )}
 
