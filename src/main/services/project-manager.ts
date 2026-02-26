@@ -193,8 +193,9 @@ export function deleteProject(projectPath: string): void {
 export async function showNewProjectDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
     const result = await dialog.showSaveDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
         title: 'Create New Project',
-        defaultPath: join(app.getPath('documents'), 'Untitled Review'),
+        defaultPath: join(app.getPath('documents'), 'Untitled Review.tdmd'),
         buttonLabel: 'Create Project',
+        filters: [{ name: 'ThreadMed Project', extensions: ['tdmd'] }],
         properties: ['createDirectory', 'showOverwriteConfirmation'] as any
     })
 
@@ -202,6 +203,7 @@ export async function showNewProjectDialog(parentWindow: BrowserWindow | null): 
 
     // Extract name from the chosen path
     let filePath = result.filePath
+    if (!filePath.toLowerCase().endsWith('.tdmd')) filePath += '.tdmd'
     const name = basename(filePath).replace(/\.tdmd$/i, '')
 
     return createProject(filePath, name)
@@ -209,12 +211,16 @@ export async function showNewProjectDialog(parentWindow: BrowserWindow | null): 
 
 /** Show an Open dialog for selecting an existing .tdmd project */
 export async function showOpenProjectDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
+    // On macOS, you can select directories that look like files using filters
+    // On Windows/Linux, you still need to select a directory, but you can't filter by dir extension in the native dialog
+    const isMac = process.platform === 'darwin'
+
     const result = await dialog.showOpenDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
         title: 'Open Project',
         defaultPath: app.getPath('documents'),
         buttonLabel: 'Open Project',
-        properties: ['openDirectory'],
-        filters: [] // Can't filter by directory extension in all OSes, we'll validate manually
+        properties: isMac ? ['openDirectory', 'openFile'] : ['openDirectory'],
+        filters: isMac ? [{ name: 'ThreadMed Project', extensions: ['tdmd'] }] : []
     })
 
     if (result.canceled || result.filePaths.length === 0) return null
@@ -223,7 +229,7 @@ export async function showOpenProjectDialog(parentWindow: BrowserWindow | null):
 
     // Validate it's a .tdmd directory with a database inside
     if (!selectedPath.toLowerCase().endsWith('.tdmd')) {
-        throw new Error('Please select a .tdmd project folder.')
+        throw new Error('Please select a folder ending with .tdmd')
     }
 
     const dbFile = join(selectedPath, 'threadmed.db')

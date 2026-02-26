@@ -5,8 +5,8 @@
 // open an existing .tdmd project, or pick from recent projects.
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react'
-import { FolderOpen, Plus, Trash2, Clock, FileText, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { FolderOpen, Plus, Trash2, Clock, FileText, ChevronRight, Edit2, Check, X } from 'lucide-react'
 
 interface Project {
     name: string
@@ -23,6 +23,11 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    // Rename state
+    const [editingPath, setEditingPath] = useState<string | null>(null)
+    const [editValue, setEditValue] = useState('')
+    const editInputRef = useRef<HTMLInputElement>(null)
+
     const loadRecent = useCallback(async () => {
         try {
             const projects = await window.api.projects.list()
@@ -37,6 +42,14 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps) {
     useEffect(() => {
         loadRecent()
     }, [loadRecent])
+
+    // Focus input when editing starts
+    useEffect(() => {
+        if (editingPath && editInputRef.current) {
+            editInputRef.current.focus()
+            editInputRef.current.select()
+        }
+    }, [editingPath])
 
     const handleNewProject = async () => {
         try {
@@ -85,6 +98,36 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps) {
         } catch (err) {
             console.error('[ProjectPicker] Failed to delete project:', err)
         }
+    }
+
+    const handleStartRename = (project: Project, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setEditingPath(project.path)
+        setEditValue(project.name)
+    }
+
+    const handleSaveRename = async (projectPath: string, e?: React.MouseEvent | React.FormEvent) => {
+        e?.stopPropagation()
+        e?.preventDefault()
+
+        const trimmed = editValue.trim()
+        if (!trimmed) {
+            setEditingPath(null)
+            return
+        }
+
+        try {
+            await window.api.projects.rename(projectPath, trimmed)
+            setEditingPath(null)
+            loadRecent()
+        } catch (err: any) {
+            setError(err?.message || 'Failed to rename project')
+        }
+    }
+
+    const handleCancelRename = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setEditingPath(null)
     }
 
     const formatDate = (dateStr: string) => {
@@ -150,37 +193,93 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps) {
                         Recent Projects
                     </p>
                     <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm">
-                        {recentProjects.map((project, i) => (
-                            <button
-                                key={project.path}
-                                onClick={() => handleOpenRecent(project)}
-                                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[var(--color-bg-hover)] transition-colors group ${i > 0 ? 'border-t border-[var(--color-border-subtle)]' : ''
-                                    }`}
-                            >
-                                <div className="w-9 h-9 rounded-lg bg-[var(--color-bg-active)] flex items-center justify-center shrink-0">
-                                    <FileText size={16} className="text-[var(--color-accent)]" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[14px] font-medium text-[var(--color-text-primary)] truncate">
-                                        {project.name}
-                                    </p>
-                                    <p className="text-[11px] text-[var(--color-text-tertiary)] truncate">
-                                        {project.path}
-                                    </p>
-                                </div>
-                                <span className="text-[11px] text-[var(--color-text-tertiary)] shrink-0 mr-2">
-                                    {formatDate(project.lastOpenedAt)}
-                                </span>
-                                <button
-                                    onClick={(e) => handleDeleteProject(project, e)}
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-500/10 text-[var(--color-text-tertiary)] hover:text-red-400 transition-all shrink-0"
-                                    title="Delete project"
+                        {recentProjects.map((project, i) => {
+                            const isEditing = editingPath === project.path
+
+                            return (
+                                <div
+                                    key={project.path}
+                                    onClick={() => !isEditing && handleOpenRecent(project)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors group ${isEditing ? 'bg-[var(--color-bg-hover)]' : 'cursor-pointer hover:bg-[var(--color-bg-hover)]'
+                                        } ${i > 0 ? 'border-t border-[var(--color-border-subtle)]' : ''}`}
                                 >
-                                    <Trash2 size={14} />
-                                </button>
-                                <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-50 shrink-0 transition-opacity" />
-                            </button>
-                        ))}
+                                    <div className="w-9 h-9 rounded-lg bg-[var(--color-bg-active)] flex items-center justify-center shrink-0">
+                                        <FileText size={16} className="text-[var(--color-accent)]" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        {isEditing ? (
+                                            <form
+                                                onSubmit={(e) => handleSaveRename(project.path, e)}
+                                                className="flex items-center gap-2"
+                                            >
+                                                <input
+                                                    ref={editInputRef}
+                                                    type="text"
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Escape') {
+                                                            setEditingPath(null)
+                                                        }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="flex-1 bg-[var(--color-bg-active)] border border-[var(--color-accent)] rounded px-2 py-0.5 text-[14px] font-medium text-[var(--color-text-primary)] outline-none"
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    className="p-1 rounded hover:bg-[var(--color-accent-subtle)] text-[var(--color-accent)] transition-colors"
+                                                    title="Save"
+                                                >
+                                                    <Check size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCancelRename}
+                                                    className="p-1 rounded hover:bg-neutral-500/20 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+                                                    title="Cancel"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </form>
+                                        ) : (
+                                            <>
+                                                <p className="text-[14px] font-medium text-[var(--color-text-primary)] truncate">
+                                                    {project.name}
+                                                </p>
+                                                <p className="text-[11px] text-[var(--color-text-tertiary)] truncate">
+                                                    {project.path}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {!isEditing && (
+                                        <>
+                                            <span className="text-[11px] text-[var(--color-text-tertiary)] shrink-0 mr-2">
+                                                {formatDate(project.lastOpenedAt)}
+                                            </span>
+                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => handleStartRename(project, e)}
+                                                    className="p-1.5 rounded-md hover:bg-[var(--color-bg-active)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-all shrink-0"
+                                                    title="Rename project"
+                                                >
+                                                    <Edit2 size={13} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteProject(project, e)}
+                                                    className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--color-text-tertiary)] hover:text-red-400 transition-all shrink-0 ml-1"
+                                                    title="Delete project"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                            <ChevronRight size={14} className="text-[var(--color-text-tertiary)] opacity-0 group-hover:opacity-50 shrink-0 transition-opacity ml-2" />
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             )}
