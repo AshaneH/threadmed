@@ -14,7 +14,7 @@
 // ============================================================================
 
 import { app, dialog, BrowserWindow } from 'electron'
-import { join, basename, extname } from 'path'
+import { join, basename } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, cpSync, readdirSync, renameSync } from 'fs'
 import { initDatabase, closeDatabase } from '../database/connection'
 
@@ -120,19 +120,20 @@ export function openProject(projectPath: string): Project {
     initDatabase(projectPath)
 
     // Derive project name from directory basename
+    // Derive project name from directory basename
     const name = basename(projectPath)
 
-    const project: Project {
+    const project: Project = {
         name,
         path: projectPath,
         lastOpenedAt: new Date().toISOString()
-}
+    }
 
-activeProject = project
-addToRecent(project)
+    activeProject = project
+    addToRecent(project)
 
-console.log(`[ProjectManager] Opened project: ${name}`)
-return project
+    console.log(`[ProjectManager] Opened project: ${name}`)
+    return project
 }
 
 /** Get the currently active project */
@@ -184,9 +185,10 @@ export function deleteProject(projectPath: string): void {
 /** Show a Save dialog for creating a new project */
 export async function showNewProjectDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
     const result = await dialog.showSaveDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
-        title: 'Create New Project Folder',
+        title: 'Create New Project Folder (Type Name Below)',
         defaultPath: join(app.getPath('documents'), 'Untitled Review'),
         buttonLabel: 'Create Folder',
+        nameFieldLabel: 'Folder Name:',
         properties: ['createDirectory', 'showOverwriteConfirmation'] as any
     })
 
@@ -218,6 +220,41 @@ export async function showOpenProjectDialog(parentWindow: BrowserWindow | null):
     }
 
     return openProject(selectedPath)
+}
+
+/** Show a Save dialog for duplicating/saving the current project as a new folder */
+export async function showSaveProjectAsDialog(parentWindow: BrowserWindow | null): Promise<Project | null> {
+    const current = getActiveProject()
+    if (!current) throw new Error('No project is currently open')
+
+    const result = await dialog.showSaveDialog(parentWindow ?? BrowserWindow.getFocusedWindow()!, {
+        title: 'Save Project As (Type New Folder Name Below)',
+        defaultPath: current.path + ' Copy',
+        buttonLabel: 'Save As Folder',
+        nameFieldLabel: 'New Folder Name:',
+        properties: ['createDirectory', 'showOverwriteConfirmation'] as any
+    })
+
+    if (result.canceled || !result.filePath) return null
+
+    const newPath = result.filePath
+    if (existsSync(newPath)) {
+        throw new Error('Destination folder already exists. Please choose a new name.')
+    }
+
+    // Must close current DB before copying because it may be locked
+    closeDatabase()
+
+    try {
+        // Copy the whole directory structure
+        cpSync(current.path, newPath, { recursive: true })
+        // Re-open from the new path
+        return openProject(newPath)
+    } catch (err) {
+        // Re-open original if copy failed
+        openProject(current.path)
+        throw new Error(`Failed to copy project: ${(err as Error).message}`)
+    }
 }
 
 // ── Migration ────────────────────────────────────────────────────────────────

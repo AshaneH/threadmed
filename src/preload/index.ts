@@ -17,7 +17,17 @@ const api = {
         open: () => ipcRenderer.invoke('projects:open'),
         openRecent: (path: string) => ipcRenderer.invoke('projects:openRecent', path),
         delete: (path: string) => ipcRenderer.invoke('projects:delete', path),
-        rename: (path: string, newName: string) => ipcRenderer.invoke('projects:rename', path, newName)
+        rename: (path: string, newName: string) => ipcRenderer.invoke('projects:rename', path, newName),
+        onOpened: (callback: (project: any) => void) => {
+            const listener = (_event: Electron.IpcRendererEvent, project: any) => callback(project)
+            ipcRenderer.on('project:opened', listener)
+            return () => { ipcRenderer.removeListener('project:opened', listener) }
+        },
+        onClosed: (callback: () => void) => {
+            const listener = () => callback()
+            ipcRenderer.on('project:closed', listener)
+            return () => { ipcRenderer.removeListener('project:closed', listener) }
+        }
     },
 
     // ── Papers ─────────────────────────────────────────────────────────────

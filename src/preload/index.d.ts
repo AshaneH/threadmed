@@ -19,6 +19,8 @@ export interface ThreadMedAPI {
         openRecent: (path: string) => Promise<Project>
         delete: (path: string) => Promise<void>
         rename: (path: string, newName: string) => Promise<Project>
+        onOpened: (callback: (project: Project) => void) => () => void
+        onClosed: (callback: () => void) => () => void
     }
     papers: {
         list: () => Promise<PaperWithAuthors[]>

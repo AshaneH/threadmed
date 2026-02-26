@@ -9,7 +9,7 @@ import { is } from '@electron-toolkit/utils'
 import { closeDatabase, getPdfDir } from './database/connection'
 import { registerIpcHandlers } from './ipc/handlers'
 import { getPaper } from './database/repositories/papers'
-import { migrateIfNeeded, listRecentProjects, openProject, showNewProjectDialog, showOpenProjectDialog, getActiveProject } from './services/project-manager'
+import { migrateIfNeeded, listRecentProjects, openProject, showNewProjectDialog, showOpenProjectDialog, showSaveProjectAsDialog, getActiveProject } from './services/project-manager'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -95,6 +95,17 @@ app.whenReady().then(() => {
                     click: async () => {
                         const win = BrowserWindow.getFocusedWindow()
                         const project = await showOpenProjectDialog(win)
+                        if (project && win) {
+                            win.webContents.send('project:opened', project)
+                        }
+                    }
+                },
+                {
+                    label: 'Save Project As...',
+                    accelerator: 'CmdOrCtrl+Shift+S',
+                    click: async () => {
+                        const win = BrowserWindow.getFocusedWindow()
+                        const project = await showSaveProjectAsDialog(win)
                         if (project && win) {
                             win.webContents.send('project:opened', project)
                         }

@@ -40,6 +40,20 @@ function App() {
         })()
     }, [])
 
+    // Listen for OS native menu events (New, Open, Close Project)
+    useEffect(() => {
+        const cleanupOpened = window.api.projects.onOpened((project: Project) => {
+            handleProjectOpen(project)
+        })
+        const cleanupClosed = window.api.projects.onClosed(() => {
+            handleSwitchProject()
+        })
+        return () => {
+            cleanupOpened()
+            cleanupClosed()
+        }
+    }, [])
+
     const handleProjectOpen = (project: Project) => {
         setActiveProject(project)
         // Reset app state for the new project
